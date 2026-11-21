@@ -7,7 +7,7 @@
 // size corrects it, and if no keyboard comes (a hardware keyboard) it settles back.
 //
 // fitSheetToKeyboard(dialog, { sheet, scroller }) sets a <dialog> up (once; safe to call again on every open):
-//   sheet: the element whose height is capped (default: the dialog's .income-form, else the dialog itself)
+//   sheet: the element whose height is capped (default: the dialog's .sheet-form, else the dialog itself)
 //   scroller: the element that scrolls its content (default: the dialog's .dialog-scroll, else the sheet)
 // keepInSheet(dialog, el, smooth) scrolls a set-up dialog so el is in view.
 
@@ -95,7 +95,7 @@ export function fitSheetToKeyboard(dialog, opts = {}) {
     if (!dialog || !vv) return;
     if (!sheets.has(dialog)) {
         ensureStyles();
-        const sheet = opts.sheet || dialog.querySelector('.income-form') || dialog;
+        const sheet = opts.sheet || dialog.querySelector('.sheet-form') || dialog;
         const scroller = opts.scroller || dialog.querySelector('.dialog-scroll') || sheet;
         sheets.set(dialog, { sheet, scroller, expecting: null });
         dialog.classList.add('kb-fit');

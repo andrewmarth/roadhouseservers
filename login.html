@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Sign In | Roadhouse Servers</title>
     <meta name="robots" content="noindex, nofollow">
-    <meta name="theme-color" content="#4e513e">
+    <meta name="theme-color" content="#000000">
     <!-- Installable app: manifest, icons, iPhone home-screen settings and the service worker -->
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
@@ -13,53 +13,45 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Roadhouse">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});</script>
     
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Familjen+Grotesk:wght@400..700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
-        /* --- Brand Palette (same as andrewmarth.com) --- */
+        /* --- Roadhouse palette: near-black with light gray text, red for actions, gold for headings --- */
         :root {
-            --cream: #e9e2d8;
-            --brown: #4f2d2c;
-            --olive: #4e513e;
-            --tan: #99724b;
-            --rust: #9a5d40;
-            --gold: #c09050;
-            --navy: #0E2A3B;
-            --white: #ffffff;
-            --error: #c0392b;
+            --bg: #0c0d0e;
+            --panel: #131516;
+            --raised: #1c1e20;
+            --line: #252224;
+            --line-strong: #3a3d40;
+            --text: #f2f3f4;
+            --muted: #a7afb2;
+            --red: #ed2227;
+            --red-bright: #f02729;
+            --gold: #c79048;
+            --error: #ff5a5d;
             --ease: cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        html { background-color: var(--olive); }
+        html { background-color: var(--bg); }
         body {
-            font-family: 'Familjen Grotesk', sans-serif;
+            font-family: 'Roboto Slab', serif;
             line-height: 1.5;
-            color: var(--brown);
+            color: var(--text);
+            background: radial-gradient(ellipse at 50% 0%, #1d1f21 0%, var(--bg) 65%) fixed;
             min-height: 100vh;
             min-height: 100svh;
             -webkit-tap-highlight-color: transparent;
         }
-        h1, h2 { font-family: 'Bricolage Grotesque', sans-serif; }
+        h1, h2 { font-family: 'Oswald', sans-serif; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
         a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
-
-        /* --- Video background (same as the website) --- */
-        .bg-video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
-        .bg-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: -1;
-            background:
-                radial-gradient(ellipse at center, rgba(78, 81, 62, 0.62) 0%, rgba(78, 81, 62, 0.88) 75%),
-                linear-gradient(180deg, rgba(14, 42, 59, 0.3) 0%, rgba(78, 81, 62, 0.4) 55%, rgba(79, 45, 44, 0.8) 100%);
-        }
 
         .page {
             min-height: 100vh;
@@ -68,22 +60,23 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 26px;
+            gap: 28px;
             padding: calc(env(safe-area-inset-top, 0px) + 28px) 20px calc(env(safe-area-inset-bottom, 0px) + 24px) 20px;
         }
 
         .top-logo { display: block; line-height: 0; }
-        .top-logo img { height: 40px; width: auto; filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35)); }
+        .top-logo img { height: 74px; width: auto; }
 
         /* --- Sign-in card --- */
         .card {
-            width: calc(100% - 6px);
-            max-width: 440px;
-            background: var(--white);
-            border: 2px solid var(--navy);
-            border-radius: 24px;
-            box-shadow: 6px 6px 0px var(--navy);
-            padding: 36px 32px 30px 32px;
+            width: 100%;
+            max-width: 420px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-top: 3px solid var(--red);
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+            padding: 32px 30px 28px 30px;
             text-align: center;
             opacity: 0;
             transform: translateY(20px);
@@ -91,73 +84,62 @@
         }
         @keyframes rise { to { opacity: 1; transform: none; } }
 
-        .eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 0.78rem;
-            font-weight: 700;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            color: var(--rust);
-            margin-bottom: 10px;
-        }
-        .eyebrow::before, .eyebrow::after { content: ''; width: 18px; height: 2px; background: currentColor; }
+        .eyebrow { display: block; font-family: 'Oswald', sans-serif; font-size: 0.95rem; letter-spacing: 2.5px; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
 
-        .card h1 { font-size: 2.1rem; line-height: 1.1; color: var(--brown); margin-bottom: 8px; }
-        .card .lead { font-size: 1.02rem; opacity: 0.85; margin-bottom: 24px; }
+        .card h1 { font-size: 2.4rem; line-height: 1.05; margin-bottom: 8px; }
+        .card .lead { font-size: 1rem; color: var(--muted); margin-bottom: 24px; }
 
-        /* Steps slide between "phone" and "code" */
+        /* Steps slide between "phone", "code" and "name" */
         .step { display: none; }
         .step.is-active { display: block; animation: stepIn 0.42s var(--ease) both; }
         @keyframes stepIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
 
-        .field-label { display: block; text-align: left; font-size: 0.9rem; font-weight: bold; margin: 0 0 8px 6px; }
+        .field-label { display: block; text-align: left; font-size: 0.9rem; font-weight: 700; margin: 0 0 8px 4px; }
 
         .phone-field {
             display: flex;
             align-items: center;
-            border: 2px solid var(--navy);
-            border-radius: 999px;
-            background: #f7f4f0;
+            border: 1px solid var(--line-strong);
+            border-radius: 10px;
+            background: var(--bg);
             overflow: hidden;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
-        .phone-field:focus-within { background: var(--white); border-color: var(--tan); box-shadow: 0 0 0 4px rgba(192, 144, 80, 0.22); }
-        .phone-prefix { padding: 0 6px 0 22px; font-weight: bold; font-size: 1.1rem; color: var(--olive); }
+        .phone-field:focus-within { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(199, 144, 72, 0.3); }
+        .phone-prefix { padding: 0 6px 0 18px; font-weight: 700; font-size: 1.1rem; color: var(--gold); }
         .phone-field input { flex: 1; min-width: 0; border: none; background: transparent; outline: none; }
-        .phone-field .name-input { padding-left: 22px; }
+        .phone-field .name-input { padding-left: 18px; }
         .name-gap { margin-top: 14px; }
 
         .text-input {
             width: 100%;
-            min-height: 56px;
-            padding: 14px 22px 14px 6px;
+            min-height: 54px;
+            padding: 14px 18px 14px 6px;
             font-family: inherit;
-            font-size: 1.15rem;
-            color: var(--brown);
+            font-size: 1.1rem;
+            color: var(--text);
         }
+        .text-input::placeholder, .code-input::placeholder { color: #6c7275; }
         .code-input {
             width: 100%;
             min-height: 60px;
-            border: 2px solid var(--navy);
-            border-radius: 18px;
-            background: #f7f4f0;
+            border: 1px solid var(--line-strong);
+            border-radius: 10px;
+            background: var(--bg);
             text-align: center;
-            font-family: 'Bricolage Grotesque', sans-serif;
-            font-size: 1.9rem;
-            font-weight: 700;
+            font-family: 'Oswald', sans-serif;
+            font-size: 2rem;
             letter-spacing: 0.45em;
             padding: 10px 0 10px 0.45em;
-            color: var(--brown);
-            transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+            color: var(--text);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
-        .code-input:focus { outline: none; background: var(--white); border-color: var(--tan); box-shadow: 0 0 0 4px rgba(192, 144, 80, 0.22); }
-        .has-error .phone-field, .has-error .code-input { border-color: var(--error); background: #fdf2f2; }
+        .code-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(199, 144, 72, 0.3); }
+        .has-error .phone-field, .has-error .code-input { border-color: var(--error); }
 
-        .message { min-height: 1.4em; margin: 10px 4px 0 4px; font-size: 0.92rem; font-weight: bold; text-align: left; }
+        .message { min-height: 1.4em; margin: 10px 4px 0 4px; font-size: 0.92rem; font-weight: 700; text-align: left; }
         .message.is-error { color: var(--error); }
-        .message.is-info { color: var(--olive); }
+        .message.is-info { color: var(--gold); }
 
         .btn {
             display: inline-flex;
@@ -168,19 +150,19 @@
             min-height: 52px;
             margin-top: 16px;
             padding: 12px 24px;
-            border: 2px solid var(--navy);
+            border: none;
             border-radius: 999px;
-            background-color: var(--tan);
-            color: var(--cream);
-            font-family: inherit;
-            font-size: 1.05rem;
-            font-weight: bold;
+            background-color: var(--red);
+            color: #fff;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.15rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
             cursor: pointer;
-            box-shadow: 0 4px 10px rgba(153, 114, 75, 0.2);
-            transition: background-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease, opacity 0.2s ease;
+            transition: background-color 0.25s ease, transform 0.25s ease, opacity 0.2s ease;
         }
         @media (hover: hover) {
-            .btn:not(:disabled):hover { background-color: var(--rust); transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+            .btn:not(:disabled):hover { background-color: var(--red-bright); transform: translateY(-2px); }
         }
         .btn:active { transform: scale(0.98); }
         .btn:disabled { opacity: 0.65; cursor: wait; }
@@ -189,8 +171,8 @@
             width: 18px;
             height: 18px;
             border-radius: 50%;
-            border: 3px solid rgba(233, 226, 216, 0.35);
-            border-top-color: var(--cream);
+            border: 3px solid rgba(255, 255, 255, 0.35);
+            border-top-color: #fff;
             animation: spin 0.8s linear infinite;
         }
         .btn.is-loading .spinner { display: inline-block; }
@@ -203,39 +185,38 @@
             background: none;
             border: none;
             font-family: inherit;
-            font-size: 0.95rem;
-            font-weight: bold;
-            color: var(--tan);
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--gold);
             text-decoration: underline;
             text-underline-offset: 3px;
             cursor: pointer;
             min-height: 44px;
             padding: 0 4px;
         }
-        .link-btn:disabled { color: var(--brown); opacity: 0.5; text-decoration: none; cursor: default; }
+        .link-btn:disabled { color: var(--muted); opacity: 0.6; text-decoration: none; cursor: default; }
 
-        .fine-print { margin-top: 18px; font-size: 0.78rem; opacity: 0.65; line-height: 1.4; }
+        .fine-print { margin-top: 18px; font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
 
         /* Setup notice (shown until Firebase is configured) */
         .setup-notice {
             display: none;
             margin-top: 14px;
             padding: 14px 16px;
-            border-radius: 14px;
-            background: #fdf6e9;
-            border: 1px solid rgba(192, 144, 80, 0.5);
+            border-radius: 10px;
+            background: var(--raised);
+            border: 1px solid var(--line-strong);
             font-size: 0.92rem;
             text-align: left;
         }
         .not-configured .setup-notice { display: block; }
 
         #recaptcha-container { position: absolute; }
-        .mini-footer { font-size: 0.75rem; text-align: center; color: var(--cream); opacity: 0.72; line-height: 1.4; }
-        .mini-footer a { color: var(--cream); text-decoration: none; }
 
         @media (max-width: 480px) {
-            .card { padding: 30px 22px 24px 22px; }
-            .card h1 { font-size: 1.9rem; }
+            .card { padding: 28px 22px 24px 22px; }
+            .card h1 { font-size: 2.1rem; }
+            .top-logo img { height: 62px; }
         }
         @media (prefers-reduced-motion: reduce) {
             .card, .step.is-active { animation: none; opacity: 1; transform: none; }
@@ -244,18 +225,12 @@
 </head>
 <body>
 
-    <video class="bg-video" poster="https://andrewmarth.com/images/banner_poster.webp" autoplay loop muted playsinline aria-hidden="true">
-        <source src="https://andrewmarth.com/images/banner_web.mp4" type="video/mp4">
-    </video>
-    <div class="bg-overlay"></div>
 
     <div class="page">
-        <a href="https://andrewmarth.com" class="top-logo" aria-label="Andrew Marth Real Estate">
-            <img src="https://andrewmarth.com/images/andrew_marth_logo_alt.webp" alt="Andrew Marth Real Estate Agent" width="1600" height="376">
-        </a>
+        <div class="top-logo"><img src="/icons/logo-white.png" alt="RoadHouse Cinemas" width="1077" height="439"></div>
 
         <main class="card" id="card">
-            <span class="eyebrow">Roadhouse Servers</span>
+            <span class="eyebrow">Servers</span>
 
             <!-- Step 1: phone number -->
             <form class="step is-active" id="step-phone" novalidate>
@@ -324,13 +299,10 @@
 
         <div id="recaptcha-container"></div>
 
-        <footer class="mini-footer">
-            Andrew Marth, agent affiliated with Compass &middot; AZ License SA711359000 &middot; <a href="tel:4806521330">480.652.1330</a>
-        </footer>
     </div>
 
     <script type="module">
-        import { firebaseConfig, isConfigured, PORTAL_API_URL, FIREBASE_SDK } from '/firebase-config.js';
+        import { firebaseConfig, isConfigured, API_URL, FIREBASE_SDK } from '/firebase-config.js';
 
         const card = document.getElementById('card');
         const stepPhone = document.getElementById('step-phone');
@@ -416,17 +388,17 @@
         // After signing in: a phone number that isn't in the ACCOUNT LIST yet goes to sign-up; everyone else to nextPage()
         async function goAfterSignIn(user) {
             let isNew = false;
-            if (PORTAL_API_URL) {
+            if (API_URL) {
                 try {
                     const idToken = await user.getIdToken();
-                    const json = await fetch(PORTAL_API_URL, {
+                    const json = await fetch(API_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                         body: JSON.stringify({ idToken }),
                     }).then(r => r.json());
                     isNew = json && json.ok === false && json.error === 'not_found';
                 } catch (err) {
-                    console.error(err); // can't tell: the portal decides
+                    console.error(err); // can't tell: the home page decides
                 }
             }
             if (!isNew) { location.replace(nextPage()); return; }
@@ -439,7 +411,7 @@
                 if (!firstName || !lastName) { setMessage(stepName, nameMsg, 'Please enter your first and last name.'); return; }
                 setLoading(nameBtn, true);
                 try {
-                    const json = await fetch(PORTAL_API_URL, {
+                    const json = await fetch(API_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                         body: JSON.stringify({ idToken: await user.getIdToken(), action: 'signup', nameOnly: true, firstName, lastName }),
@@ -462,7 +434,7 @@
             const auth = getAuth(initializeApp(firebaseConfig));
             auth.useDeviceLanguage();
 
-            // Already signed in? Go straight back to the page they came from (or the portal home page).
+            // Already signed in? Go straight back to the page they came from (or the home page).
             let leaving = false;
             onAuthStateChanged(auth, user => { if (user && !leaving) { leaving = true; goAfterSignIn(user); } });
 

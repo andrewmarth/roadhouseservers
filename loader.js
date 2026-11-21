@@ -1,18 +1,15 @@
-// Loading screen animation (home page and pages): the text cycles through house-building phrases while
+// Loading screen animation: the text cycles through theater phrases while
 // the icon morphs from one drawing into the next. Every icon is a set of strokes; each stroke is sampled
 // into the same number of points, and the points glide to the matching stroke of the next icon.
 (function () {
     const STEPS = [
-        { text: 'Nailing the boards...', icon: ['M2 17h20v4H2z', 'M17 12v5', 'M12 7.5 5 14.5', 'M10 3l5.5 5.5-2.5 2.5L7.5 5.5z'] },
-        { text: 'Testing the wiring...', icon: ['M7 2h10a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3z', 'M9 7v3', 'M15 7v3', 'M10.5 17.5v-1a1.5 1.5 0 0 1 3 0v1z'] },
-        { text: 'Checking for leaks...', icon: ['M2 4h11a6 6 0 0 1 6 6v3', 'M2 9h10a2 2 0 0 1 2 2v2', 'M12 13h9', 'M16.5 16s-2 2.4-2 3.8a2 2 0 0 0 4 0c0-1.4-2-3.8-2-3.8z'] },
-        { text: 'Approving the plans...', icon: ['M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z', 'M9 3v15', 'M15 6v15'] },
-        { text: 'Installing the roof...', icon: ['M1.5 13 12 3.5 22.5 13', 'M5 14 12 7.5l7 6.5', 'M16.5 6.5V3h3v6.5'] },
-        { text: 'Writing the loan...', icon: ['M2 6h20v12H2z', 'M12 9a3 3 0 1 1 0 6a3 3 0 1 1 0-6z', 'M6 12h.01', 'M18 12h.01'] },
-        { text: 'Sending the offer...', icon: ['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z', 'M14 2v6h6', 'M8 12h8', 'M8 17.5c1-2 2-2 3 0s2 2 3 0'] },
-        { text: 'Calling in a favor...', icon: ['M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.4 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z', 'M15 2a7 7 0 0 1 7 7', 'M15 6a3 3 0 0 1 3 3'] },
-        { text: 'Getting a discount...', icon: ['M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a3 3 0 0 0 0 6v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a3 3 0 0 0 0-6z', 'M9 15l6-6', 'M9.5 9.5h.01', 'M14.5 14.5h.01'] },
-        { text: 'Hoping for the best...', icon: ['M7 12.5h11a1 1 0 0 1 1 1V16a5 5 0 0 1-5 5h-2a6 6 0 0 1-6-6v-1.5a1 1 0 0 1 1-1z', 'M8.5 12.5 13.4 3.3a1.4 1.4 0 0 1 2.5 1.2L11.5 12.5', 'M15.5 12.5 10.6 3.3a1.4 1.4 0 0 0-2.5 1.2L12.5 12.5', 'M7 16h5'] },
+        { text: 'Popping the popcorn...', icon: ['M18 8a2 2 0 0 0 0-4 2 2 0 0 0-4 0 2 2 0 0 0-4 0 2 2 0 0 0-4 0 2 2 0 0 0 0 4', 'M10 22 9 8', 'M14 22l1-14', 'M20 8c.5 0 .9.4.8 1l-2.6 12c-.1.5-.7 1-1.2 1H7c-.6 0-1.1-.4-1.2-1L3.2 9c-.1-.6.3-1 .8-1z'] },
+        { text: 'Dimming the lights...', icon: ['M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5', 'M9 18h6', 'M10 22h4'] },
+        { text: 'Rolling the trailers...', icon: ['M3 3h18v18H3z', 'M7 3v18', 'M17 3v18', 'M3 12h18', 'M3 7.5h4', 'M3 16.5h4', 'M17 7.5h4', 'M17 16.5h4'] },
+        { text: 'Pouring the drinks...', icon: ['M6 8l1.75 12.28a2 2 0 0 0 2 1.72h4.54a2 2 0 0 0 2-1.72L18 8', 'M5 8h14', 'M7 15a6.47 6.47 0 0 1 5 0 6.47 6.47 0 0 0 5 0', 'M12 8l1-6h2'] },
+        { text: 'Setting the tables...', icon: ['M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2', 'M7 2v20', 'M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3v7'] },
+        { text: 'Firing the orders...', icon: ['M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z'] },
+        { text: 'Cueing the movie...', icon: ['M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z', 'M6.2 5.3l3.1 3.9', 'M12.4 3.4l3.1 4', 'M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'] },
     ];
     const POINTS = 80;
     const HOLD = 1300;   // ms each phrase stays up
