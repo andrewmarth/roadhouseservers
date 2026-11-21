@@ -14,10 +14,10 @@ const CSS = `
 @keyframes sheetDialogIn { from { opacity: 0; transform: translateY(24px) scale(0.98); } to { opacity: 1; transform: none; } }
 @keyframes sheetFadeIn { from { opacity: 0; } to { opacity: 1; } }
 .sheet .sheet-form { display: flex; flex-direction: column; max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); }
-.sheet .dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 6px; padding: 24px 28px 0 28px; }
-.sheet .dialog-head h2 { font-size: 1.9rem; line-height: 1.1; }
+.sheet .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 28px 14px 28px; }
+.sheet .dialog-head h2 { font-size: 1.5rem; line-height: 1.1; }
 .sheet .close-btn {
-    flex: 0 0 auto; width: 40px; height: 40px; margin: -4px -6px 0 0;
+    flex: 0 0 auto; width: 40px; height: 40px; margin: 0 -6px 0 0;
     display: inline-flex; align-items: center; justify-content: center;
     border: none; border-radius: 50%; background: var(--raised); color: var(--text); cursor: pointer;
 }
@@ -56,7 +56,7 @@ const CSS = `
     .sheet[open] { animation: sheetUp 0.42s var(--ease); }
     @keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
     .sheet .sheet-form { max-height: 92vh; max-height: 92dvh; }
-    .sheet .dialog-head { padding: 22px 20px 0 20px; }
+    .sheet .dialog-head { padding: 14px 20px 12px 20px; }
     .sheet .muted { padding: 0 20px; }
     .sheet .dialog-scroll { padding: 4px 20px 8px 20px; }
     .sheet .dialog-foot { padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 16px) 20px; border-radius: 0; }
