@@ -1,0 +1,28 @@
+// --- Client portal sign-in settings ---
+// Shared by login.html and index.html (the same Firebase sign-in and Portal API as portal.andrewmarth.com).
+//
+// 1. Firebase (phone number sign-in): Firebase console > Project settings > General >
+//    "Your apps" > Web app > SDK setup and configuration > Config. Paste the values below.
+//    These values are public by design; your data is protected by the Portal API's sign-in check.
+export const firebaseConfig = {
+    apiKey: 'AIzaSyDdwjGBP5ZwdtZhlq8wsLHbgn2UwfYKDrQ',
+    authDomain: 'andrew-marth-portal.firebaseapp.com',
+    projectId: 'andrew-marth-portal',
+    appId: '1:1067689166695:web:d315fcf943f7b8430991c2',
+};
+
+// 2. Client data: the Portal API (api/, a Cloud Run function in the "Website APIs" project; data in Firestore).
+//    Leave empty to show the placeholder.
+export const PORTAL_API_URL = 'https://portal-api-673039696492.us-west1.run.app';
+
+// True once the Firebase values above have been filled in
+export const isConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.appId);
+
+// Client ID = phone number without the country code, symbols or spaces (e.g. 4805551234)
+export function phoneToId(phoneNumber) {
+    const digits = String(phoneNumber || '').replace(/\D/g, '');
+    return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+}
+
+// Firebase SDK (pinned version, loaded from Google)
+export const FIREBASE_SDK = 'https://www.gstatic.com/firebasejs/10.12.2';
