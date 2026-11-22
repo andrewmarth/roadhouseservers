@@ -75,26 +75,13 @@
         .rh-check { display: flex; align-items: center; gap: 10px; font-weight: bold; cursor: pointer; }
         .rh-check input { flex: 0 0 auto; width: 22px; height: 22px; accent-color: var(--red); }
 
-        /* Each server on a showing: who, and their rows (a row another server has is greyed out with their name) */
-        .rh-asgs { display: flex; flex-direction: column; gap: 12px; }
-        .rh-asg { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
-        .rh-asg-head { display: flex; align-items: center; gap: 10px; }
-        .rh-asg-head .rh-server { flex: 1; min-width: 0; }
-        .rh-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 8px; border-radius: 12px; }
-        .rh-rows.is-invalid { outline: 2px solid var(--red); outline-offset: 4px; }
-        .rh-rows-empty { grid-column: 1 / -1; padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--line-strong); font-size: 0.9rem; color: var(--muted); }
-        .rh-row { position: relative; }
-        .rh-row input { position: absolute; opacity: 0; pointer-events: none; }
-        .rh-row span {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            min-height: 52px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--panel); color: var(--text);
-            font-family: 'Oswald', sans-serif; font-size: 1.3rem; line-height: 1.1; cursor: pointer;
-            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-        }
-        .rh-row small { font-family: 'Roboto Slab', serif; font-size: 0.6rem; line-height: 1.1; max-width: 100%; padding: 0 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-        .rh-row input:checked + span { background: var(--red); border-color: var(--red); color: #fff; }
-        .rh-row input:disabled + span { cursor: not-allowed; opacity: 0.45; border-style: dashed; }
-        .rh-row input:focus-visible + span { outline: 3px solid var(--gold); outline-offset: 2px; }
+        /* Each row of the showing on its own line, with the server who has it */
+        .rh-rowlines { display: flex; flex-direction: column; gap: 8px; }
+        .rh-rowline { display: flex; align-items: center; gap: 12px; }
+        .rh-rowname { flex: 0 0 auto; width: 74px; font-family: 'Oswald', sans-serif; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .rh-rowline .rh-server { flex: 1; min-width: 0; min-height: 48px; padding-top: 8px; padding-bottom: 8px; }
+        .rh-rowline .rh-server.is-set { border-color: var(--red); }
+        .rh-rows-empty { padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--line-strong); font-size: 0.9rem; color: var(--muted); }
 
         .rh-sum { display: flex; flex-direction: column; gap: 2px; margin-top: -8px; }
         .rh-sum-main { font-family: 'Oswald', sans-serif; font-size: 1.4rem; line-height: 1.25; text-transform: uppercase; }
@@ -108,7 +95,6 @@
         .rh-confirm { font-weight: bold; }
         @media (max-width: 600px) {
             .rh-entry { padding: 14px 12px; }
-            .rh-asg { padding: 12px 10px; }
             .rh-entry-actions { flex-direction: column-reverse; }
             .rh-entry-actions .btn { width: 100%; }
         }
@@ -211,7 +197,7 @@
 
         // --- The form's values ---
         const blankTime = () => ({ h: '', m: '', ap: 'PM' });
-        const blankDraft = kind => (kind === 'show' ? { aud: '', start: blankTime(), end: blankTime(), last: false, assignments: [{ server: '', rows: [] }] }
+        const blankDraft = kind => (kind === 'show' ? { aud: '', start: blankTime(), end: blankTime(), last: false, assignments: [] }
             : kind === 'restroom' ? { time: blankTime(), server: '' } : { time: blankTime() });
         const copy = v => JSON.parse(JSON.stringify(v));
         const audOf = v => (/^\d{1,2}$/.test(String(v)) && ROWS[Number(v)] ? Number(v) : 0);
@@ -225,10 +211,22 @@
                 assignments: s.assignments.map(a => ({ server: a.server, rows: [...a.rows] })) });
         const itemOf = (e, d) => (e.kind === 'restroom' ? { id: e.id, kind: 'restroom', time: timeOf(d.time), server: d.server }
             : { id: e.id, auditorium: audOf(d.aud), start: timeOf(d.start), end: timeOf(d.end), last: d.last,
-                assignments: d.assignments.filter(a => a.server || a.rows.length).map(a => ({ server: a.server, rows: a.rows })) });
+                assignments: d.assignments.map(a => ({ server: a.server, rows: a.rows })) });
         const changed = e => e.editing && JSON.stringify(e.draft) !== JSON.stringify(e.saved || blankDraft(e.kind));
-        // Which server has each row of a showing (other than assignment `except`)
-        const takenRows = (d, except) => { const t = {}; d.assignments.forEach((a, j) => { if (j !== except) a.rows.forEach(r => { t[r] = a.server; }); }); return t; };
+
+        // Who has a row ('' for no one), and giving it to a server (or no one); a server with no rows left is taken off
+        const serverOf = (d, r) => (d.assignments.find(a => a.rows.includes(r)) || {}).server || '';
+        function setRow(d, r, server) {
+            const all = ROWS[audOf(d.aud)] || '';
+            d.assignments.forEach(a => { a.rows = a.rows.filter(x => x !== r); });
+            if (server) {
+                let a = d.assignments.find(x => x.server === server);
+                if (!a) d.assignments.push(a = { server, rows: [] });
+                a.rows.push(r);
+                a.rows.sort((x, y) => all.indexOf(x) - all.indexOf(y));
+            }
+            d.assignments = d.assignments.filter(a => a.rows.length);
+        }
 
         // --- Drawing ---
         const timeHtml = (k, which, label, t) => {
@@ -243,29 +241,21 @@
                 + '<span class="rh-ampm">' + ['AM', 'PM'].map(ap => '<button type="button" data-ap="' + ap + '" aria-pressed="' + (t.ap === ap) + '">' + ap + '</button>').join('') + '</span>'
                 + '</div></div>';
         };
-        // A server picker (servers already on this showing are left out, except this one's own)
-        const serverSelect = (value, usedElsewhere, label) => '<select class="rh-server" aria-label="' + label + '"><option value="">Pick a server</option>'
-            + servers.filter(s => s.id === value || !usedElsewhere.includes(s.id)).map(s => '<option value="' + escapeHtml(s.id) + '"' + (s.id === value ? ' selected' : '') + '>' + escapeHtml(s.name) + '</option>').join('')
+        // A server picker (blank: Unassigned / Pick a server)
+        const serverSelect = (value, blank, label, extra = '') => '<select class="rh-server' + extra + '" aria-label="' + label + '"><option value="">' + blank + '</option>'
+            + servers.map(s => '<option value="' + escapeHtml(s.id) + '"' + (s.id === value ? ' selected' : '') + '>' + escapeHtml(s.name) + '</option>').join('')
             + (value && !servers.some(s => s.id === value) ? '<option value="' + escapeHtml(value) + '" selected>Removed server</option>' : '') + '</select>';
-        function assignHtml(d, k) {
+        function assignHtml(d) {
             const n = audOf(d.aud);
-            const used = d.assignments.map(a => a.server).filter(Boolean);
-            return '<div class="rh-asgs">' + d.assignments.map((a, j) => {
-                const taken = takenRows(d, j);
-                const rows = !n ? '<p class="rh-rows-empty">Enter the auditorium to see its rows.</p>'
-                    : ROWS[n].split('').map(r => {
-                        const other = taken[r];
-                        return '<label class="rh-row"><input type="checkbox" value="' + r + '"' + (a.rows.includes(r) ? ' checked' : '') + (other !== undefined ? ' disabled' : '') + '>'
-                            + '<span>' + r + (other !== undefined ? '<small>' + escapeHtml(other ? serverName(other).split(' ')[0] : 'Taken') + '</small>' : '') + '</span></label>';
-                    }).join('');
-                return '<div class="rh-asg" data-j="' + j + '"><div class="rh-asg-head">' + serverSelect(a.server, used.filter(s => s !== a.server), 'Server ' + (j + 1))
-                    + '<button type="button" class="rh-remove" data-remove-asg aria-label="Take this server off">' + CLOSE + 'Remove</button></div>'
-                    + '<div class="rh-rows" role="group" aria-label="Rows for server ' + (j + 1) + '">' + rows + '</div></div>';
-            }).join('') + '</div>'
-                + '<button type="button" class="rh-add" data-add-asg' + (d.assignments.length >= servers.length ? ' hidden' : '') + '>' + PLUS + 'Add Server</button>';
+            if (!n) return '<p class="rh-rows-empty">Enter the auditorium to see its rows.</p>';
+            return '<div class="rh-rowlines">' + ROWS[n].split('').map(r => {
+                const server = serverOf(d, r);
+                return '<div class="rh-rowline" data-row="' + r + '"><span class="rh-rowname">Row ' + r + '</span>'
+                    + serverSelect(server, 'Unassigned', 'Server for row ' + r, server ? ' is-set' : '') + '</div>';
+            }).join('') + '</div>';
         }
         // The rows of a showing no server has yet
-        const openRows = d => { const n = audOf(d.aud); const t = takenRows(d, -1); return n ? ROWS[n].split('').filter(r => t[r] === undefined) : []; };
+        const openRows = d => { const n = audOf(d.aud); return n ? ROWS[n].split('').filter(r => !serverOf(d, r)) : []; };
 
         function entryHtml(e, k) {
             const title = e.kind === 'lastCall' ? 'When is last call?' : e.kind === 'restroom' ? 'Restroom Check'
@@ -298,15 +288,15 @@
                 if (e.kind === 'lastCall') {
                     body = timeHtml(k, 'time', 'Last Call', d.time) + '<p class="rh-hint">Showings that end after it drop at last call. Leave it blank if there’s none.</p>';
                 } else if (e.kind === 'restroom') {
-                    body = timeHtml(k, 'time', 'Time', d.time) + '<div class="field"><span class="rh-label">Server</span>' + serverSelect(d.server, [], 'Server for this restroom check') + '</div>';
+                    body = timeHtml(k, 'time', 'Time', d.time) + '<div class="field"><span class="rh-label">Server</span>' + serverSelect(d.server, 'Pick a server', 'Server for this restroom check') + '</div>';
                 } else {
                     body = '<div class="field"><label for="rh-aud-' + k + '">Auditorium</label>'
                         + '<input id="rh-aud-' + k + '" class="rh-aud" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="1–14" value="' + escapeHtml(d.aud) + '">'
                         + '<p class="rh-error rh-aud-error" role="alert"></p></div>'
                         + timeHtml(k, 'start', 'Start Time', d.start) + timeHtml(k, 'end', 'End Time', d.end)
                         + '<label class="rh-check"><input type="checkbox" class="rh-last"' + (d.last ? ' checked' : '') + '>This is the last showing of the night</label>'
-                        + '<div><span class="rh-label">Servers</span><p class="rh-hint">Pick each server and their rows. A row can go to only one server.</p>'
-                        + '<div data-assign>' + assignHtml(d, k) + '</div></div>';
+                        + '<div><span class="rh-label">Rows</span><p class="rh-hint">Pick the server for each row (leave a row Unassigned if no one has it yet).</p>'
+                        + '<div data-assign>' + assignHtml(d) + '</div></div>';
                 }
                 body += '<p class="rh-error" data-entry-error role="alert"></p>'
                     + '<div class="rh-entry-actions">' + (e.saved ? '<button type="button" class="btn btn-secondary" data-cancel>Cancel</button>' : '')
@@ -324,7 +314,7 @@
         const entryOf = el => { const box = el.closest('[data-k]'); return box ? { box, e: entries[Number(box.dataset.k)] } : {}; };
         const boxOf = e => listEl.querySelector('[data-k="' + entries.indexOf(e) + '"]');
         const clearInvalid = box => box.querySelectorAll('.is-invalid').forEach(x => x.classList.remove('is-invalid'));
-        const redrawAssign = (box, e) => { box.querySelector('[data-assign]').innerHTML = assignHtml(e.draft, Number(box.dataset.k)); };
+        const redrawAssign = (box, e) => { box.querySelector('[data-assign]').innerHTML = assignHtml(e.draft); };
 
         // The saved schedule from the API → the entries (ones being edited keep what's typed; new unsaved ones stay)
         function apply(json) {
@@ -354,7 +344,7 @@
             ev.target.value = ev.target.value.replace(/\D/g, '').slice(0, 2);
             e.draft.aud = ev.target.value;
             const n = audOf(e.draft.aud);
-            if (n) e.draft.assignments.forEach(a => { a.rows = a.rows.filter(r => ROWS[n].includes(r)); });
+            if (n) { e.draft.assignments.forEach(a => { a.rows = a.rows.filter(r => ROWS[n].includes(r)); }); e.draft.assignments = e.draft.assignments.filter(a => a.rows.length); }
             box.querySelector('.rh-aud-error').textContent = e.draft.aud && !n ? 'Auditoriums are 1 to 14.' : '';
             redrawAssign(box, e);
         });
@@ -366,14 +356,9 @@
             if (t && ev.target.matches('.rh-h')) e.draft[t.dataset.time].h = ev.target.value;
             if (t && ev.target.matches('.rh-m')) e.draft[t.dataset.time].m = ev.target.value;
             if (ev.target.matches('.rh-last')) e.draft.last = ev.target.checked;
-            const asg = ev.target.closest('[data-j]');
-            if (asg && ev.target.matches('.rh-server')) { e.draft.assignments[Number(asg.dataset.j)].server = ev.target.value; redrawAssign(box, e); }
-            else if (!asg && ev.target.matches('.rh-server')) e.draft.server = ev.target.value;
-            if (asg && ev.target.matches('.rh-row input')) {
-                const all = ROWS[audOf(e.draft.aud)] || '';
-                e.draft.assignments[Number(asg.dataset.j)].rows = [...asg.querySelectorAll('.rh-row input:checked')].map(x => x.value).sort((a, b) => all.indexOf(a) - all.indexOf(b));
-                redrawAssign(box, e);
-            }
+            const line = ev.target.closest('[data-row]');
+            if (line && ev.target.matches('.rh-server')) { setRow(e.draft, line.dataset.row, ev.target.value); ev.target.classList.toggle('is-set', !!ev.target.value); }
+            else if (ev.target.matches('.rh-server')) e.draft.server = ev.target.value;
         });
         listEl.addEventListener('click', ev => {
             const add = ev.target.closest('[data-add-entry]');
@@ -396,9 +381,6 @@
                 t.querySelectorAll('[data-ap]').forEach(b => b.setAttribute('aria-pressed', String(b === ap)));
                 clearInvalid(box);
             }
-            if (ev.target.closest('[data-add-asg]')) { e.draft.assignments.push({ server: '', rows: [] }); redrawAssign(box, e); }
-            const removeAsg = ev.target.closest('[data-remove-asg]');
-            if (removeAsg) { e.draft.assignments.splice(Number(removeAsg.closest('[data-j]').dataset.j), 1); redrawAssign(box, e); }
             if (ev.target.closest('[data-edit]')) {
                 Object.assign(e, { editing: true, draft: copy(e.saved) });
                 draw();
@@ -419,7 +401,7 @@
                     box.querySelector('[data-entry-error]').textContent = p[1];
                     p[0].classList.add('is-invalid');
                     p[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
-                    (p[0].matches('.rh-rows') ? p[0].querySelector('input:not(:disabled)') || p[0] : p[0]).focus({ preventScroll: true });
+                    p[0].focus({ preventScroll: true });
                     return;
                 }
                 save(e, ev.target.closest('.btn'), e.kind === 'lastCall' ? { lastCall: timeOf(e.draft.time) || '' } : { item: itemOf(e, e.draft) });
@@ -442,13 +424,6 @@
             const t = timeProblem('start', 'start time') || timeProblem('end', 'end time');
             if (t) return t;
             if (moment(day, timeOf(d.end)) <= moment(day, timeOf(d.start))) return [box.querySelector('[data-time="end"] .rh-h'), 'The end time has to be after the start time.'];
-            for (let j = 0; j < d.assignments.length; j++) {
-                const a = d.assignments[j];
-                if (!a.server && !a.rows.length) continue;   // (an empty one is left out)
-                const asg = box.querySelector('[data-j="' + j + '"]');
-                if (!a.server) return [asg.querySelector('.rh-server'), 'Please pick the server for these rows.'];
-                if (!a.rows.length) return [asg.querySelector('.rh-rows'), 'Please pick at least one row for ' + serverName(a.server) + '.'];
-            }
             return null;
         }
         // Saves one entry's change (or removes it) into the shared schedule; the schedule comes back as it is now
