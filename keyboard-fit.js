@@ -13,11 +13,13 @@
 // keepInSheet(dialog, el, smooth) scrolls a set-up dialog so el is in view.
 
 const EASE = 'cubic-bezier(0.2, 0, 0, 1)';
+// The sheet rises by its bottom margin, not a translate: a translate runs on the compositor a frame ahead of the
+// max-height change (a layout), so the sheet's top edge bounced as the keyboard went down; both are layout now, in step.
 const CSS = `
 @media (max-width: 600px) {
-    dialog.kb-fit { translate: 0 calc(-1 * var(--kb-lift, 0px)); transition: translate 0.3s ${EASE}; }
+    dialog.kb-fit { margin-bottom: var(--kb-lift, 0px); transition: margin-bottom 0.3s ${EASE}; }
     dialog.kb-fit .kb-fit-sheet { transition: max-height 0.3s ${EASE}; }
-    dialog.kb-fit.kb-fit-sheet { transition: translate 0.3s ${EASE}, max-height 0.3s ${EASE}; }
+    dialog.kb-fit.kb-fit-sheet { transition: margin-bottom 0.3s ${EASE}, max-height 0.3s ${EASE}; }
     dialog.kb-fit.is-keyboard .kb-fit-sheet, dialog.kb-fit.is-keyboard.kb-fit-sheet { max-height: calc(var(--kb-visible, 100dvh) - 10px); }
     /* (a sheet that's the dialog itself scrolls once it's capped) */
     dialog.kb-fit.is-keyboard.kb-fit-sheet { overflow-y: auto; }
