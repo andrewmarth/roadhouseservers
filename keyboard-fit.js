@@ -4,7 +4,8 @@
 // what's left of the screen, gliding with the keyboard's own easing; the box being typed in is scrolled into view.
 // A tap on a box starts the sheet moving right away (by the keyboard's last height, or a typical one the first time),
 // so it rises with the keyboard instead of after it and the browser has no need to scroll the page; the keyboard's real
-// size corrects it, and if no keyboard comes (a hardware keyboard) it settles back.
+// size corrects it, and if no keyboard comes (a hardware keyboard) it settles back. On Chrome for Android the keyboard's
+// size comes from the VirtualKeyboard API instead (see vk below).
 //
 // fitSheetToKeyboard(dialog, { sheet, scroller }) sets a <dialog> up (once; safe to call again on every open):
 //   sheet: the element whose height is capped (default: the dialog's .sheet-form, else the dialog itself)
@@ -36,6 +37,13 @@ export function keyboardFit(layoutHeight, visibleHeight, offsetTop) {
 }
 
 const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+// Chrome on Android: the VirtualKeyboard API. With overlaysContent the browser leaves the page alone as the keyboard comes
+// and goes (in a browser tab it otherwise resizes and pans the visible part step by step, and the sheet stuttered chasing
+// each step) and just reports the keyboard's size, so the sheet glides once to sit on it. Elsewhere (iPhone) the visible
+// part (vv) is used as above.
+const vk = typeof navigator !== 'undefined' && navigator.virtualKeyboard ? navigator.virtualKeyboard : null;
+// (a hidden box as tall as env(keyboard-inset-height): the keyboard's height in CSS pixels)
+let kbProbe = null;
 const phone = typeof window !== 'undefined' ? window.matchMedia('(max-width: 600px)') : null;
 const touch = typeof window !== 'undefined' ? window.matchMedia('(pointer: coarse)') : null;
 // Boxes that bring up the keyboard (not choices, dates, pickers or buttons)
@@ -80,21 +88,33 @@ function reset(dialog) {
 function fit(dialog) {
     const s = sheets.get(dialog);
     if (!s || !dialog.open || !vv) return;
-    const { up, lift } = phone.matches ? keyboardFit(window.innerHeight, vv.height, vv.offsetTop) : { up: false, lift: 0 };
+    // (Chrome: the page keeps its full height, and the keyboard sits over its bottom)
+    const kb = kbProbe ? Math.round(kbProbe.getBoundingClientRect().height || vk.boundingRect.height) : 0;
+    const { up, lift } = !phone.matches ? { up: false, lift: 0 }
+        : kbProbe ? keyboardFit(window.innerHeight, window.innerHeight - kb, 0) : keyboardFit(window.innerHeight, vv.height, vv.offsetTop);
     // (the sheet moved up ahead of the keyboard: a resize before the keyboard arrives doesn't drop it back down)
     if (!up && s.expecting) return;
-    if (up) { lastKeyboard = Math.round(window.innerHeight - vv.height); clearTimeout(s.expecting); s.expecting = null; }
-    setFit(dialog, up, lift, vv.height);
+    if (up) { lastKeyboard = kbProbe ? kb : Math.round(window.innerHeight - vv.height); clearTimeout(s.expecting); s.expecting = null; }
+    setFit(dialog, up, lift, kbProbe ? window.innerHeight - kb : vv.height);
     // (once the sheet has settled)
     if (up) setTimeout(() => keepInSheet(dialog, document.activeElement, true), 320);
 }
 const fitAll = () => sheets.forEach((s, dialog) => fit(dialog));
-if (vv) { vv.addEventListener('resize', fitAll); vv.addEventListener('scroll', fitAll); }
+// (Chrome: the keyboard's size, read a frame later so env(keyboard-inset-height) has caught up)
+if (vk) vk.addEventListener('geometrychange', () => requestAnimationFrame(fitAll));
+if (vv) { vv.addEventListener('resize', () => { if (!kbProbe) fitAll(); }); vv.addEventListener('scroll', () => { if (!kbProbe) fitAll(); }); }
 
 export function fitSheetToKeyboard(dialog, opts = {}) {
     if (!dialog || !vv) return;
     if (!sheets.has(dialog)) {
         ensureStyles();
+        if (vk && !kbProbe) {
+            vk.overlaysContent = true;
+            kbProbe = document.createElement('div');
+            kbProbe.setAttribute('aria-hidden', 'true');
+            kbProbe.style.cssText = 'position:fixed;left:0;bottom:0;width:0;visibility:hidden;pointer-events:none;height:env(keyboard-inset-height, 0px)';
+            document.body.append(kbProbe);
+        }
         const sheet = opts.sheet || dialog.querySelector('.sheet-form') || dialog;
         const scroller = opts.scroller || dialog.querySelector('.dialog-scroll') || sheet;
         sheets.set(dialog, { sheet, scroller, expecting: null });
