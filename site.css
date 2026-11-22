@@ -1,0 +1,163 @@
+/* Shared by every page: the Roadhouse palette, base styles, the loading screen, the header and the page heading */
+/* --- Roadhouse palette: near-black with light gray text, red for actions, gold for headings --- */
+:root {
+    --bg: #0c0d0e;
+    --panel: #131516;
+    --raised: #1c1e20;
+    --line: #252224;
+    --line-strong: #3a3d40;
+    --text: #f2f3f4;
+    --muted: #a7afb2;
+    --red: #ed2227;
+    --red-bright: #f02729;
+    --gold: #c79048;
+    --gold-dark: #a67433;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { background-color: var(--bg); }
+body {
+    font-family: 'Roboto Slab', serif;
+    line-height: 1.55;
+    color: var(--text);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    -webkit-tap-highlight-color: transparent;
+}
+/* Hidden until we know who is signed in and the data has loaded (only the loading screen shows) */
+body.is-checking > *:not(.page-loader) { visibility: hidden; }
+/* No scrolling (or pull-to-refresh bounce) while the loading screen is up */
+html:has(body.is-checking), body.is-checking { overflow: hidden; overscroll-behavior: none; }
+.page-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: var(--bg);
+    color: var(--text);
+    touch-action: none;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+body:not(.is-checking) .page-loader { opacity: 0; visibility: hidden; pointer-events: none; }
+/* Morphing icon (loader.js): pops with a twist each time it changes */
+.loader-badge { width: 120px; height: 120px; margin-bottom: 14px; color: var(--gold); display: flex; align-items: center; justify-content: center; }
+.loader-icon { width: 92px; height: 92px; overflow: visible; }
+.loader-badge.is-morphing .loader-icon { animation: iconMorph 0.65s cubic-bezier(0.34, 1.4, 0.64, 1); }
+@keyframes iconMorph {
+    0% { transform: rotate(0deg) scale(1); }
+    40% { transform: rotate(-12deg) scale(0.84); }
+    75% { transform: rotate(4deg) scale(1.08); }
+    100% { transform: rotate(0deg) scale(1); }
+}
+.page-loader-text { font-family: 'Oswald', sans-serif; font-size: 1.25rem; letter-spacing: 1px; text-transform: uppercase; opacity: 0.9; transition: opacity 0.22s ease, transform 0.22s ease; }
+.page-loader-text.is-leaving { opacity: 0; transform: translateY(-8px); }
+.page-loader-text.is-entering { animation: phraseIn 0.35s cubic-bezier(0.2, 0.8, 0.3, 1); }
+@keyframes phraseIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 0.9; transform: none; } }
+/* Loading bar: a red segment that sweeps across the track, over and over */
+.loader-bar { position: relative; width: 180px; height: 4px; margin-top: 16px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.loader-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 40%;
+    border-radius: 999px;
+    background: var(--red);
+    animation: loaderBar 1.3s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes loaderBar { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) {
+    .loader-bar::before { animation-duration: 3s; }
+    .loader-badge.is-morphing .loader-icon, .page-loader-text.is-entering { animation: none; }
+}
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+h1, h2, h3 { font-family: 'Oswald', sans-serif; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+/* --- Header: the logo on black, like the theater's own site --- */
+header { background: #000; border-bottom: 1px solid var(--line); padding: env(safe-area-inset-top, 0px) 20px 0 20px; }
+.top-bar { max-width: 760px; min-height: 76px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.top-bar img { height: 46px; width: auto; display: block; }
+.sign-out {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 8px 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text);
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+.sign-out svg { width: 16px; height: 16px; }
+@media (hover: hover) { .sign-out:hover { background: var(--red); border-color: var(--red); } }
+
+/* --- Main card --- */
+main {
+    flex: 1;
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 28px 20px 60px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+.main-card { padding: 0; }
+.card-eyebrow { display: block; font-family: 'Oswald', sans-serif; font-size: 1rem; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); margin-bottom: 2px; }
+.main-card h2 { font-size: 2.4rem; line-height: 1.05; margin-bottom: 6px; }
+.card-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+.top-actions { display: flex; align-items: center; gap: 8px; }
+
+@media (max-width: 600px) {
+    .top-bar { min-height: 64px; }
+    .top-bar img { height: 38px; }
+    .sign-out { padding: 8px 13px; font-size: 0.85rem; }
+    main { padding-top: 22px; }
+    .main-card h2 { font-size: 2rem; }
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 10px 26px;
+    border: 1px solid var(--red);
+    border-radius: 999px;
+    background-color: var(--red);
+    color: #fff;
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.05rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.25s ease, transform 0.25s ease;
+}
+.btn svg { width: 18px; height: 18px; }
+@media (hover: hover) { .btn:hover { background-color: var(--red-bright); transform: translateY(-2px); } }
+.btn:disabled { opacity: 0.65; cursor: wait; transform: none; }
+.btn-secondary { background: transparent; border-color: var(--line-strong); color: var(--text); }
+@media (hover: hover) { .btn-secondary:hover { background: var(--raised); } }
+.btn .btn-spinner { display: none; width: 16px; height: 16px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.35); border-top-color: #fff; animation: spin 0.8s linear infinite; }
+.btn.is-loading .btn-spinner { display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
