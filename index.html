@@ -459,8 +459,6 @@
     <script type="module">
         import { firebaseConfig, isConfigured, API_URL, FIREBASE_SDK } from '/firebase-config.js';
         import { ensureDialogStyles, lockPageScroll } from '/sheet.js';
-        // (temporary: ?kbdebug=1 records how the sheet follows the keyboard)
-        if (new URLSearchParams(location.search).has('kbdebug')) import('/kb-debug.js');
 
         // --- Time: everything is Arizona time (MST all year, UTC-7). A day runs from 6 AM to 6 AM, so the show times
         // are erased at 6 AM (the API deletes an earlier day's list; an open page clears itself). ---
