@@ -83,6 +83,12 @@
                     <span class="page-link-text"><span class="page-link-title">Server Dashboard</span><span class="page-link-sub">Your theaters, show times and what’s next</span></span>
                     <span class="page-link-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
                 </a></li>
+                <!-- (Server leads only) -->
+                <li id="lead-link" hidden><a class="page-link" href="/lead">
+                    <span class="page-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
+                    <span class="page-link-text"><span class="page-link-title">Lead Dashboard</span><span class="page-link-sub">Today’s show times and who has which rows</span></span>
+                    <span class="page-link-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
+                </a></li>
                 <!-- (Roadhouse admins only) -->
                 <li id="admin-link" hidden><a class="page-link" href="/admin">
                     <span class="page-link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
@@ -121,7 +127,9 @@
                     const row = (json && json.row) || {};
                     const name = String(row['PREFERRED NAME'] || row['FIRST NAME'] || '').trim();
                     if (name) document.getElementById('greeting').textContent = 'Hi, ' + name;
-                    document.getElementById('admin-link').hidden = String(row['ROADHOUSE ADMIN']).toUpperCase() !== 'TRUE';
+                    const has = role => String(row[role]).toUpperCase() === 'TRUE';
+                    document.getElementById('lead-link').hidden = !has('SERVER LEAD');
+                    document.getElementById('admin-link').hidden = !has('ROADHOUSE ADMIN');
                 } catch (err) {
                     console.error(err); // (the greeting just stays "Welcome")
                 }
