@@ -29,6 +29,9 @@
         /* --- The day's schedule: last call, then each showing and restroom check, each saved on its own and then
            shown locked behind Edit --- */
         .rh-entries { display: flex; flex-direction: column; gap: 14px; }
+        /* A section per auditorium (then new showings, then restroom checks) */
+        .rh-section { display: flex; flex-direction: column; gap: 14px; margin-top: 26px; }
+        .rh-section-title { padding: 0 2px 8px; border-bottom: 1px solid var(--line); font-size: 1.35rem; color: var(--text); }
         .rh-entry { display: grid; gap: 16px; min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
         .rh-entry.is-editing { border-color: var(--gold); }
         .rh-entry-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 30px; font-family: 'Oswald', sans-serif; font-size: 1rem; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); }
@@ -257,9 +260,7 @@
         // The rows of a showing no server has yet
         const openRows = d => { const n = audOf(d.aud); return n ? ROWS[n].split('').filter(r => !serverOf(d, r)) : []; };
 
-        function entryHtml(e, k) {
-            const title = e.kind === 'lastCall' ? 'When is last call?' : e.kind === 'restroom' ? 'Restroom Check'
-                : 'Showing ' + entries.slice(0, k + 1).filter(x => x.kind === 'show').length;
+        function entryHtml(e, k, title) {
             const what = e.kind === 'restroom' ? 'restroom check' : 'showing';
             let head = '';
             if (!e.editing && !e.removing) {
@@ -278,7 +279,7 @@
                 else if (e.kind === 'restroom') body = '<div class="rh-sum"><p class="rh-sum-main">' + clockOf(d.time) + '</p><p class="rh-sum-sub">' + escapeHtml(serverName(d.server)) + '</p></div>';
                 else {
                     const open = openRows(d);
-                    body = '<div class="rh-sum"><p class="rh-sum-main">Auditorium ' + escapeHtml(d.aud) + '</p><p class="rh-sum-sub">' + clockOf(d.start) + ' – ' + clockOf(d.end) + '</p>'
+                    body = '<div class="rh-sum"><p class="rh-sum-main">' + clockOf(d.start) + ' – ' + clockOf(d.end) + '</p>'
                         + (d.assignments.length ? d.assignments.map(a => '<p class="rh-sum-line"><b>' + escapeHtml(serverName(a.server)) + '</b> · ' + (a.rows.length === 1 ? 'Row ' : 'Rows ') + a.rows.join(', ') + '</p>').join('') : '<p class="rh-sum-open">No servers yet</p>')
                         + (d.assignments.length && open.length ? '<p class="rh-sum-open">Unassigned: ' + open.join(', ') + '</p>' : '')
                         + (d.last ? '<p class="rh-sum-tag">Last showing of the night</p>' : '') + '</div>';
@@ -306,8 +307,20 @@
             return '<fieldset class="rh-entry' + (e.editing ? ' is-editing' : '') + '" data-k="' + k + '"><legend class="sr-only">' + escapeHtml(title) + '</legend>'
                 + '<div class="rh-entry-head"><span>' + escapeHtml(title) + '</span>' + head + '</div>' + body + '</fieldset>';
         }
+        // Last call, then a section per auditorium (its showings by start time), new showings not saved yet, and the
+        // restroom checks by time. Saved ones sit by what's saved, so one being edited doesn't move until it's saved.
         function draw() {
-            listEl.innerHTML = '<div class="rh-entries">' + entries.map(entryHtml).join('') + '</div>'
+            const all = entries.map((e, k) => ({ e, k }));
+            const at = (x, t) => moment(day, timeOf(x.e.saved[t]));
+            const byTime = t => (a, b) => (!a.e.saved ? 1 : !b.e.saved ? -1 : at(a, t) - at(b, t)) || (a.k - b.k);
+            const shows = all.filter(x => x.e.kind === 'show' && x.e.saved);
+            const auds = [...new Set(shows.map(x => audOf(x.e.saved.aud)))].sort((a, b) => a - b);
+            const section = (title, items, name) => (items.length ? '<section class="rh-section"><h3 class="rh-section-title">' + title + '</h3>'
+                + items.map((x, i) => entryHtml(x.e, x.k, name(x, i))).join('') + '</section>' : '');
+            listEl.innerHTML = '<div class="rh-entries">' + all.filter(x => x.e.kind === 'lastCall').map(x => entryHtml(x.e, x.k, 'When is last call?')).join('') + '</div>'
+                + auds.map(n => section('Auditorium ' + n, shows.filter(x => audOf(x.e.saved.aud) === n).sort(byTime('start')), (x, i) => 'Showing ' + (i + 1))).join('')
+                + section('New Showing', all.filter(x => x.e.kind === 'show' && !x.e.saved), () => 'New Showing')
+                + section('Restroom Checks', all.filter(x => x.e.kind === 'restroom').sort(byTime('time')), () => 'Restroom Check')
                 + '<button type="button" class="rh-add" data-add-entry="show"' + (entries.length - 1 >= MAX_ITEMS ? ' hidden' : '') + '>' + PLUS + 'Add Another Showing</button>'
                 + '<button type="button" class="rh-add" data-add-entry="restroom"' + (entries.length - 1 >= MAX_ITEMS ? ' hidden' : '') + '>' + PLUS + 'Add Restroom Check</button>';
         }
@@ -367,7 +380,7 @@
                 const kind = add.dataset.addEntry;
                 entries.push({ id: '', kind, saved: null, draft: blankDraft(kind), editing: true });
                 draw();
-                const box = listEl.querySelector('.rh-entries').lastElementChild;
+                const box = boxOf(entries[entries.length - 1]);
                 box.scrollIntoView({ block: 'start', behavior: 'smooth' });
                 box.querySelector('input, select').focus({ preventScroll: true });
                 return;
@@ -441,6 +454,8 @@
                 if (change.removeId) entries.splice(entries.indexOf(target), 1);
                 apply(json);
                 draw();
+                const moved = change.removeId ? null : entries.find(e => (target.id ? e.id === target.id : e === target));
+                if (moved && boxOf(moved)) boxOf(moved).scrollIntoView({ block: 'center', behavior: 'smooth' });
             } catch (err) {
                 console.error(err);
                 if (error) error.textContent = errorText(err);
