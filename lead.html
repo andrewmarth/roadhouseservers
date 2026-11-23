@@ -105,6 +105,12 @@
         .rh-entry-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
         .rh-entry-actions .btn { min-height: 44px; padding: 8px 20px; }
         .rh-confirm { font-weight: bold; }
+        .rh-log { margin-top: 8px; font-size: 0.78rem; color: var(--muted); }
+        .rh-log summary { cursor: pointer; width: max-content; }
+        .rh-log ul { list-style: none; margin-top: 6px; display: flex; flex-direction: column; gap: 8px; }
+        .rh-log b { font-weight: 700; color: var(--text); }
+        .rh-log b, .rh-log span { display: block; }
+        .rh-log span { padding-left: 10px; }
         @media (max-width: 600px) {
             .rh-entry { padding: 14px 12px; }
             .rh-entry-actions { flex-direction: column-reverse; }
@@ -271,6 +277,10 @@
         }
         // The rows of a showing no server has yet
         const openRows = d => { const n = audOf(d.aud); return n ? ROWS[n].split('').filter(r => !serverOf(d, r)) : []; };
+        // The floorplan's change log for a showing: small and folded away (newest first)
+        const when = at => new Date(at).toLocaleString('en-US', { timeZone: 'America/Phoenix', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        const logHtml = log => (!log || !log.length ? '' : '<details class="rh-log"><summary>Floorplan changes (' + log.length + ')</summary><ul>'
+            + log.map(l => '<li><b>' + when(l.at) + ' · ' + escapeHtml(l.by || 'A lead') + '</b>' + l.rows.map(c => '<span>Row ' + c.row + ': ' + escapeHtml(c.from || 'Unassigned') + ' → ' + escapeHtml(c.to || 'Unassigned') + '</span>').join('') + '</li>').join('') + '</ul></details>');
 
         function entryHtml(e, k, title) {
             const what = e.kind === 'restroom' ? 'restroom check' : 'showing';
@@ -294,7 +304,7 @@
                     body = '<div class="rh-sum"><p class="rh-sum-main">' + clockOf(d.start) + ' – ' + clockOf(d.end) + '</p>'
                         + (d.assignments.length ? d.assignments.map(a => '<p class="rh-sum-line"><b>' + escapeHtml(serverName(a.server)) + '</b> · ' + (a.rows.length === 1 ? 'Row ' : 'Rows ') + a.rows.join(', ') + '</p>').join('') : '<p class="rh-sum-open">No servers yet</p>')
                         + (d.assignments.length && open.length ? '<p class="rh-sum-open">Unassigned: ' + open.join(', ') + '</p>' : '')
-                        + (d.last ? '<p class="rh-sum-tag">Last showing of the night</p>' : '') + '</div>';
+                        + (d.last ? '<p class="rh-sum-tag">Last showing of the night</p>' : '') + logHtml(e.log) + '</div>';
                 }
             } else {
                 const d = e.draft;
@@ -349,6 +359,7 @@
                 const was = old.find(e => e.id === s.id);
                 const e = keep(was) || { id: s.id, kind: s.kind, draft: formOf(s), editing: false };
                 e.saved = formOf(s);
+                e.log = s.log || [];
                 return e;
             });
             entries = [lastCall].concat(saved, old.filter(e => !e.id && e.kind !== 'lastCall'));
