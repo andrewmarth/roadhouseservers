@@ -228,8 +228,8 @@
     <script type="module">
         import { firebaseConfig, isConfigured, API_URL, FIREBASE_SDK } from '/firebase-config.js';
 
-        // --- Time: everything is Arizona time (MST all year, UTC-7). A day runs from 6 AM to 6 AM, so the show times
-        // are erased at 6 AM (the API deletes an earlier day's list; an open page clears itself). ---
+        // --- Time: everything is Arizona time (MST all year, UTC-7). A day runs from 6 AM to 6 AM: this page shows the
+        // current day's assignments, and at 6 AM everyone is signed out (the next day's come up on signing back in). ---
         const AZ_OFFSET = 7 * 3600e3;
         const DAY_START_HOUR = 6;
         const MIN = 60000;
@@ -309,7 +309,7 @@
             invalid_last_call: 'Please pick the whole last call time, or leave it blank.',
             end_before_start: 'The end time has to be after the start time.',
             invalid_rows: 'Please pick at least one row for each showing.',
-            shows_cleared: 'Today’s show times were cleared at 6 AM. Refresh the page.',
+            shows_cleared: 'This day’s schedule changed. Refresh the page.',
             not_found: 'This showing was changed. Refresh the page.',
             not_allowed: 'This page isn’t available for your account.',
         };
@@ -350,7 +350,7 @@
         function render() {
             if (!state) return;
             const now = Date.now();
-            nowEl.textContent = 'It’s ' + clock(now) + '. Show times clear at 6 AM.';
+            nowEl.textContent = 'It’s ' + clock(now) + '. Tomorrow’s assignments show up at 6 AM.';
             let html;
             if (!state.shows.length) {
                 html = '<div class="shows-empty"><span class="shows-empty-icon">' + FILM + '</span>'
@@ -429,7 +429,7 @@
         // (the close event comes a moment later, so it's skipped when the box has already been opened again)
         confirmBox.addEventListener('close', () => { if (!confirmBox.open) pending = null; });
 
-        // --- Keeping it current: the boxes are checked every few seconds; at 6 AM the list clears. Coming back to the app
+        // --- Keeping it current: the boxes are checked every few seconds; at 6 AM everyone is signed out. Coming back to the app
         // reloads today's list (it may have changed on another device). ---
         async function refresh() {
             try {

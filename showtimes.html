@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Showtime Dashboard | Roadhouse Servers</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#000000">
+    <!-- Installable app: manifest, icons, iPhone home-screen settings and the service worker -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Roadhouse">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});</script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/site.css">
+    <style>
+        .now-line { margin-bottom: 18px; font-size: 0.92rem; color: var(--muted); }
+        .lead-message { color: var(--muted); }
+        .lead-message a { color: var(--gold); }
+        /* Which day: today and the next 4 */
+        .day-pick { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+        .day-pick label { font-family: 'Oswald', sans-serif; font-size: 1rem; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); }
+        .day-pick select {
+            flex: 1; min-width: 0; max-width: 320px; min-height: 48px; padding: 10px 40px 10px 16px; border: 1px solid var(--line-strong); border-radius: 10px;
+            font-family: inherit; font-size: 1.05rem; color: var(--text); appearance: none; -webkit-appearance: none;
+            background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c79048' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center / 16px;
+        }
+        .day-pick select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(199, 144, 72, 0.3); }
+
+        /* --- The day's schedule: last call, then each showing and restroom check, each saved on its own and then
+           shown locked behind Edit --- */
+        .rh-entries { display: flex; flex-direction: column; gap: 14px; }
+        /* A section per auditorium (then new showings, then restroom checks) */
+        .rh-section { display: flex; flex-direction: column; gap: 14px; margin-top: 26px; }
+        .rh-section-title { padding: 0 2px 8px; border-bottom: 1px solid var(--line); font-size: 1.35rem; color: var(--text); }
+        .rh-entry { display: grid; gap: 16px; min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+        .rh-entry.is-editing { border-color: var(--gold); }
+        .rh-entry-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 30px; font-family: 'Oswald', sans-serif; font-size: 1rem; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); }
+        .rh-head-actions { display: flex; align-items: center; gap: 6px; }
+        .rh-edit {
+            display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 4px 14px 4px 11px;
+            border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--text);
+            font-family: 'Oswald', sans-serif; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        .rh-edit svg { width: 15px; height: 15px; }
+        @media (hover: hover) { .rh-edit:hover { border-color: var(--gold); background: var(--raised); } }
+        .rh-remove { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: none; border-radius: 999px; background: none; cursor: pointer; font-family: inherit; font-size: 0.8rem; font-weight: bold; letter-spacing: 0; text-transform: none; color: var(--red); }
+        .rh-remove svg { width: 15px; height: 15px; }
+        @media (hover: hover) { .rh-remove:hover { background: rgba(237, 34, 39, 0.12); } }
+        .rh-add { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; margin-top: 14px; border: 2px dashed var(--line-strong); border-radius: 12px; background: none; cursor: pointer; font-family: 'Oswald', sans-serif; font-size: 1rem; letter-spacing: 1px; text-transform: uppercase; color: var(--gold); }
+        .rh-add svg { width: 17px; height: 17px; }
+        .rh-add[hidden] { display: none; }
+        @media (hover: hover) { .rh-add:hover { border-color: var(--gold); } }
+
+        .field label, .rh-label { display: block; font-size: 0.9rem; font-weight: bold; margin: 0 0 8px 4px; }
+        .field input, .field select, .rh-server {
+            width: 100%; min-height: 52px; padding: 12px 18px;
+            border: 1px solid var(--line-strong); border-radius: 10px; background-color: var(--bg);
+            font-family: inherit; font-size: 1.05rem; color: var(--text);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .field select, .rh-server {
+            padding-right: 40px; appearance: none; -webkit-appearance: none;
+            background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a7afb2' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center / 16px;
+        }
+        .field input:focus, .field select:focus, .rh-server:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(199, 144, 72, 0.3); }
+        .is-invalid { border-color: var(--red) !important; box-shadow: 0 0 0 3px rgba(237, 34, 39, 0.25) !important; }
+        .field input.rh-aud { max-width: 150px; }
+        .rh-error { margin: 6px 0 0 6px; font-size: 0.85rem; font-weight: bold; color: #ff5a5d; }
+        .rh-error:empty { display: none; }
+        .rh-time { display: flex; align-items: center; gap: 8px; }
+        .field .rh-time select { flex: 1 1 0; min-width: 0; min-height: 50px; padding: 10px 34px 10px 14px; background-position: right 10px center; }
+        .rh-colon { flex: 0 0 auto; font-weight: bold; font-size: 1.2rem; }
+        .rh-ampm { flex: 0 0 auto; display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--raised); }
+        .rh-ampm button { min-width: 46px; min-height: 42px; padding: 0 10px; border: none; border-radius: 999px; background: none; color: var(--muted); font-family: 'Oswald', sans-serif; font-size: 1rem; cursor: pointer; transition: background-color 0.2s ease, color 0.2s ease; }
+        .rh-ampm button[aria-pressed="true"] { background: var(--red); color: #fff; }
+        .rh-hint { margin: -4px 0 8px 4px; font-size: 0.85rem; color: var(--muted); }
+        .rh-check { display: flex; align-items: center; gap: 10px; font-weight: bold; cursor: pointer; }
+        .rh-check input { flex: 0 0 auto; width: 22px; height: 22px; accent-color: var(--red); }
+
+
+        .rh-sum { display: flex; flex-direction: column; gap: 2px; margin-top: -8px; }
+        .rh-sum-main { font-family: 'Oswald', sans-serif; font-size: 1.4rem; line-height: 1.25; text-transform: uppercase; }
+        .rh-sum-sub { color: var(--muted); }
+        .rh-sum-line { margin-top: 4px; }
+        .rh-sum-line b { font-weight: 700; }
+        .rh-sum-open { margin-top: 4px; color: var(--gold); font-size: 0.9rem; font-weight: 700; }
+        .rh-sum-tag { align-self: flex-start; margin-top: 6px; padding: 3px 12px; border-radius: 999px; background: var(--gold); color: #111; font-size: 0.82rem; font-weight: bold; }
+        .rh-entry-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+        .rh-entry-actions .btn { min-height: 44px; padding: 8px 20px; }
+        .rh-confirm { font-weight: bold; }
+        @media (max-width: 600px) {
+            .rh-entry { padding: 14px 12px; }
+            .rh-entry-actions { flex-direction: column-reverse; }
+            .rh-entry-actions .btn { width: 100%; }
+        }
+    </style>
+</head>
+<body class="is-checking">
+    <div class="page-loader" role="status">
+        <span class="loader-badge" aria-hidden="true"><svg class="loader-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg></span>
+        <span class="sr-only">Loading</span>
+        <span class="page-loader-text" aria-hidden="true">Popping the popcorn...</span>
+        <span class="loader-bar" aria-hidden="true"></span>
+    </div>
+    <script src="/loader.js"></script>
+
+    <header>
+        <div class="top-bar">
+            <a href="/" aria-label="Home"><img src="/icons/logo-white.png" alt="RoadHouse Cinemas" width="1077" height="439"></a>
+            <div class="top-actions">
+            <a href="/" class="sign-out">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                Back
+            </a>
+            <button type="button" class="sign-out" id="sign-out">
+                Sign Out
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+            </button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="main-card">
+            <div class="card-head">
+                <div>
+                    <span class="card-eyebrow">Manager</span>
+                    <h2>Showtimes</h2>
+                </div>
+            </div>
+            <p class="now-line">Every showing for the day, and last call. Server leads assign the rows on the Lead Dashboard.</p>
+            <div class="day-pick"><label for="day">Day</label><select id="day" disabled><option>Today</option></select></div>
+            <div id="schedule"></div>
+        </section>
+    </main>
+
+    <script type="module">
+        import { firebaseConfig, isConfigured, API_URL, FIREBASE_SDK } from '/firebase-config.js';
+
+        // --- Time: everything is Arizona time (MST all year, UTC-7). A day runs from 6 AM to 6 AM, when everyone is
+        // signed out. ---
+        const AZ_OFFSET = 7 * 3600e3;
+        const DAY_START_HOUR = 6;
+        const MIN = 60000;
+        const showDay = (ms = Date.now()) => new Date(ms - AZ_OFFSET - DAY_START_HOUR * 3600e3).toISOString().slice(0, 10);
+        function moment(day, hhmm) {
+            const [h, m] = String(hhmm).split(':').map(Number);
+            return Date.parse(day + 'T00:00:00Z') + AZ_OFFSET + (h * 60 + m) * MIN + (h < DAY_START_HOUR ? 864e5 : 0);
+        }
+        const clock = ms => new Date(ms).toLocaleTimeString('en-US', { timeZone: 'America/Phoenix', hour: 'numeric', minute: '2-digit' });
+        const pad = n => String(n).padStart(2, '0');
+
+        // The rows in each auditorium (there is no row I in 10)
+        const ROWS = { 1: 'ABCDEF', 2: 'ABCDEFG', 3: 'ABCDEF', 4: 'ABCDE', 5: 'ABCDEF', 6: 'ABCDE', 7: 'ABCD', 8: 'ABCDEF', 9: 'ABCDEF', 10: 'ABCDEFGHJ', 11: 'ABCDE', 12: 'AB', 13: 'AB', 14: 'AB' };
+        const MAX_ITEMS = 40;
+
+        const icon = d => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+        const PLUS = icon('<path d="M12 5v14"/><path d="M5 12h14"/>');
+        const EDIT = icon('<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>');
+        const CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+        const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const ERRORS = {
+            invalid_shows: 'You can add up to 40 showings and restroom checks.',
+            invalid_auditorium: 'Please enter an auditorium from 1 to 14.',
+            invalid_time: 'Please pick the time.',
+            end_before_start: 'The end time has to be after the start time.',
+            invalid_rows: 'Please pick at least one row for each server.',
+            invalid_server: 'Please pick each server from the list (someone may have lost the Server role).',
+            server_twice: 'Each server can be added to a showing only once.',
+            row_taken: 'A row can go to only one server.',
+            invalid_last_call: 'Please pick the whole last call time, or leave it blank.',
+            not_found: 'Another lead changed this. Refresh the page.',
+            invalid_day: 'That day can’t be changed anymore. Pick another day.',
+            not_allowed: 'Only managers can change the showtimes.',
+        };
+        const errorText = json => ERRORS[json && json.error] || 'Something went wrong. Please try again.';
+
+        const listEl = document.getElementById('schedule');
+        let currentUser = null;
+        // The day being shown (today or one of the next 4); today itself, for the 6 AM sign-out
+        let day = showDay();
+        const today = showDay();
+        const dayEl = document.getElementById('day');
+        let servers = [];   // [{ id, name }]: the SERVER accounts, by name
+        // Last call, then each showing: { id, kind ('lastCall' or 'show'), saved (the saved
+        // values in the form's shape; null: not saved yet), draft (the form's values), editing, removing }
+        let entries = [];
+        let busy = false;
+
+        async function api(payload) {
+            return fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ idToken: await currentUser.getIdToken(), ...payload }),
+            }).then(r => r.json());
+        }
+
+        // --- The form's values ---
+        const blankTime = () => ({ h: '', m: '', ap: 'PM' });
+        const blankDraft = kind => (kind === 'show' ? { aud: '', start: blankTime(), end: blankTime(), last: false } : { time: blankTime() });
+        const copy = v => JSON.parse(JSON.stringify(v));
+        const audOf = v => (/^\d{1,2}$/.test(String(v)) && ROWS[Number(v)] ? Number(v) : 0);
+        // "HH:MM" (24-hour) from the picker, or null until hour, minute and AM/PM are all picked
+        const timeOf = t => (t.h && t.m !== '' && t.ap ? pad((Number(t.h) % 12) + (t.ap === 'PM' ? 12 : 0)) + ':' + t.m : null);
+        const pickerOf = hhmm => { const [h, m] = hhmm.split(':').map(Number); return { h: String((h % 12) || 12), m: pad(m), ap: h >= 12 ? 'PM' : 'AM' }; };
+        const clockOf = t => clock(moment(day, timeOf(t)));
+        // (how many servers have rows in it: for the summary)
+        const formOf = s => ({ aud: String(s.auditorium), start: pickerOf(s.start), end: pickerOf(s.end), last: s.last, servers: s.assignments.length });
+        const itemOf = (e, d) => ({ id: e.id, auditorium: audOf(d.aud), start: timeOf(d.start), end: timeOf(d.end), last: d.last });
+        const changed = e => e.editing && JSON.stringify({ ...e.draft, servers: 0 }) !== JSON.stringify({ ...(e.saved || blankDraft(e.kind)), servers: 0 });
+
+        // --- Drawing ---
+        const timeHtml = (k, which, label, t) => {
+            const id = 'rh-' + which + '-' + k;
+            return '<div class="field"><span class="rh-label" id="' + id + '">' + label + '</span>'
+                + '<div class="rh-time" data-time="' + which + '" role="group" aria-labelledby="' + id + '">'
+                + '<select class="rh-h" aria-label="Hour"><option value="">Hour</option>'
+                + Array.from({ length: 12 }, (_, i) => String(i + 1)).map(h => '<option' + (h === t.h ? ' selected' : '') + '>' + h + '</option>').join('') + '</select>'
+                + '<span class="rh-colon" aria-hidden="true">:</span>'
+                + '<select class="rh-m" aria-label="Minute"><option value="">Min</option>'
+                + Array.from({ length: 60 }, (_, i) => pad(i)).map(m => '<option' + (m === t.m ? ' selected' : '') + '>' + m + '</option>').join('') + '</select>'
+                + '<span class="rh-ampm">' + ['AM', 'PM'].map(ap => '<button type="button" data-ap="' + ap + '" aria-pressed="' + (t.ap === ap) + '">' + ap + '</button>').join('') + '</span>'
+                + '</div></div>';
+        };
+        function entryHtml(e, k, title) {
+            let head = '';
+            if (!e.editing && !e.removing) {
+                head = '<span class="rh-head-actions"><button type="button" class="rh-edit" data-edit aria-label="Edit ' + escapeHtml(title) + '">' + EDIT + 'Edit</button>'
+                    + (e.kind === 'lastCall' ? '' : '<button type="button" class="rh-remove" data-remove aria-label="Remove ' + escapeHtml(title) + '">' + CLOSE + 'Remove</button>') + '</span>';
+            } else if (e.editing && !e.saved) head = '<button type="button" class="rh-remove" data-remove aria-label="Remove ' + escapeHtml(title) + '">' + CLOSE + 'Remove</button>';
+            let body;
+            if (e.removing) {
+                body = '<p class="rh-confirm">Deleting this showtime will also delete all floorplan assignments.</p>'
+                    + '<p class="rh-error" data-entry-error role="alert"></p>'
+                    + '<div class="rh-entry-actions"><button type="button" class="btn btn-secondary" data-keep>Keep It</button>'
+                    + '<button type="button" class="btn" data-remove-yes><span class="btn-spinner" aria-hidden="true"></span>Delete Showtime</button></div>';
+            } else if (!e.editing) {
+                const d = e.saved;
+                if (e.kind === 'lastCall') body = '<div class="rh-sum">' + (timeOf(d.time) ? '<p class="rh-sum-main">' + clockOf(d.time) + '</p>' : '<p class="rh-sum-sub">Not set</p>') + '</div>';
+                else {
+                    body = '<div class="rh-sum"><p class="rh-sum-main">' + clockOf(d.start) + ' – ' + clockOf(d.end) + '</p>'
+                        + '<p class="rh-sum-sub">' + (d.servers ? d.servers + (d.servers === 1 ? ' server has' : ' servers have') + ' rows' : 'No rows assigned yet') + '</p>'
+                        + (d.last ? '<p class="rh-sum-tag">Last showing of the night</p>' : '') + '</div>';
+                }
+            } else {
+                const d = e.draft;
+                if (e.kind === 'lastCall') {
+                    body = timeHtml(k, 'time', 'Last Call', d.time) + '<p class="rh-hint">Showings that end after it drop at last call. Leave it blank if there’s none.</p>';
+                } else {
+                    body = '<div class="field"><label for="rh-aud-' + k + '">Auditorium</label>'
+                        + '<input id="rh-aud-' + k + '" class="rh-aud" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="1–14" value="' + escapeHtml(d.aud) + '">'
+                        + '<p class="rh-error rh-aud-error" role="alert"></p></div>'
+                        + timeHtml(k, 'start', 'Start Time', d.start) + timeHtml(k, 'end', 'End Time', d.end)
+                        + '<label class="rh-check"><input type="checkbox" class="rh-last"' + (d.last ? ' checked' : '') + '>This is the last showing of the night</label>'
+                        + (e.saved && d.servers ? '<p class="rh-hint">A new auditorium keeps each server’s rows that it has too.</p>' : '');
+                }
+                body += '<p class="rh-error" data-entry-error role="alert"></p>'
+                    + '<div class="rh-entry-actions">' + (e.saved ? '<button type="button" class="btn btn-secondary" data-cancel>Cancel</button>' : '')
+                    + '<button type="button" class="btn" data-save><span class="btn-spinner" aria-hidden="true"></span>Save '
+                    + (e.kind === 'lastCall' ? 'Last Call' : 'Showtime') + '</button></div>';
+            }
+            return '<fieldset class="rh-entry' + (e.editing ? ' is-editing' : '') + '" data-k="' + k + '"><legend class="sr-only">' + escapeHtml(title) + '</legend>'
+                + '<div class="rh-entry-head"><span>' + escapeHtml(title) + '</span>' + head + '</div>' + body + '</fieldset>';
+        }
+        // Last call, then a section per auditorium (its showings by start time) and new showings not saved yet. Saved
+        // ones sit by what's saved, so one being edited doesn't move until it's saved.
+        function draw() {
+            const all = entries.map((e, k) => ({ e, k }));
+            const at = (x, t) => moment(day, timeOf(x.e.saved[t]));
+            const byTime = t => (a, b) => (!a.e.saved ? 1 : !b.e.saved ? -1 : at(a, t) - at(b, t)) || (a.k - b.k);
+            const shows = all.filter(x => x.e.kind === 'show' && x.e.saved);
+            const auds = [...new Set(shows.map(x => audOf(x.e.saved.aud)))].sort((a, b) => a - b);
+            const section = (title, items, name) => (items.length ? '<section class="rh-section"><h3 class="rh-section-title">' + title + '</h3>'
+                + items.map((x, i) => entryHtml(x.e, x.k, name(x, i))).join('') + '</section>' : '');
+            listEl.innerHTML = '<div class="rh-entries">' + all.filter(x => x.e.kind === 'lastCall').map(x => entryHtml(x.e, x.k, 'When is last call?')).join('') + '</div>'
+                + auds.map(n => section('Auditorium ' + n, shows.filter(x => audOf(x.e.saved.aud) === n).sort(byTime('start')), (x, i) => 'Showing ' + (i + 1))).join('')
+                + section('New Showing', all.filter(x => x.e.kind === 'show' && !x.e.saved), () => 'New Showing')
+                + '<button type="button" class="rh-add" data-add-entry="show"' + (entries.length - 1 >= MAX_ITEMS ? ' hidden' : '') + '>' + PLUS + 'Add Showtime</button>';
+        }
+        const entryOf = el => { const box = el.closest('[data-k]'); return box ? { box, e: entries[Number(box.dataset.k)] } : {}; };
+        const boxOf = e => listEl.querySelector('[data-k="' + entries.indexOf(e) + '"]');
+        const clearInvalid = box => box.querySelectorAll('.is-invalid').forEach(x => x.classList.remove('is-invalid'));
+
+        // The saved schedule from the API → the entries (ones being edited keep what's typed; new unsaved ones stay)
+        function apply(json) {
+            day = json.day;
+            servers = json.servers || servers;
+            if (json.days) drawDays(json.days);
+            const lc = { time: json.lastCall ? pickerOf(json.lastCall) : blankTime() };
+            const old = entries;
+            const keep = e => (e && e.editing ? e : null);
+            const lastCall = keep(old.find(e => e.kind === 'lastCall')) || { id: '', kind: 'lastCall', draft: copy(lc), editing: false };
+            lastCall.saved = lc;
+            // (restroom checks are the leads')
+            const saved = (json.shows || []).filter(s => s.kind === 'show').map(s => {
+                const was = old.find(e => e.id === s.id);
+                const e = keep(was) || { id: s.id, kind: s.kind, draft: formOf(s), editing: false };
+                e.saved = formOf(s);
+                return e;
+            });
+            entries = [lastCall].concat(saved, old.filter(e => !e.id && e.kind !== 'lastCall'));
+            if (entries.length === 1) entries.push({ id: '', kind: 'show', saved: null, draft: blankDraft('show'), editing: true });
+        }
+
+        // --- Typing and tapping ---
+        listEl.addEventListener('input', ev => {
+            const { box, e } = entryOf(ev.target);
+            if (!e || !ev.target.matches('.rh-aud')) return;
+            clearInvalid(box);
+            // Digits only
+            ev.target.value = ev.target.value.replace(/\D/g, '').slice(0, 2);
+            e.draft.aud = ev.target.value;
+            const n = audOf(e.draft.aud);
+            box.querySelector('.rh-aud-error').textContent = e.draft.aud && !n ? 'Auditoriums are 1 to 14.' : '';
+        });
+        listEl.addEventListener('change', ev => {
+            const { box, e } = entryOf(ev.target);
+            if (!e) return;
+            clearInvalid(box);
+            const t = ev.target.closest('[data-time]');
+            if (t && ev.target.matches('.rh-h')) e.draft[t.dataset.time].h = ev.target.value;
+            if (t && ev.target.matches('.rh-m')) e.draft[t.dataset.time].m = ev.target.value;
+            if (ev.target.matches('.rh-last')) e.draft.last = ev.target.checked;
+        });
+        listEl.addEventListener('click', ev => {
+            const add = ev.target.closest('[data-add-entry]');
+            if (add) {
+                if (entries.length - 1 >= MAX_ITEMS) return;
+                const kind = add.dataset.addEntry;
+                entries.push({ id: '', kind, saved: null, draft: blankDraft(kind), editing: true });
+                draw();
+                const box = boxOf(entries[entries.length - 1]);
+                box.scrollIntoView({ block: 'start', behavior: 'smooth' });
+                box.querySelector('input, select').focus({ preventScroll: true });
+                return;
+            }
+            const { box, e } = entryOf(ev.target);
+            if (!e || busy) return;
+            const ap = ev.target.closest('[data-ap]');
+            if (ap) {
+                const t = ap.closest('[data-time]');
+                e.draft[t.dataset.time].ap = ap.dataset.ap;
+                t.querySelectorAll('[data-ap]').forEach(b => b.setAttribute('aria-pressed', String(b === ap)));
+                clearInvalid(box);
+            }
+            if (ev.target.closest('[data-edit]')) {
+                Object.assign(e, { editing: true, draft: copy(e.saved) });
+                draw();
+                boxOf(e).querySelector('input, select').focus();
+            }
+            if (ev.target.closest('[data-cancel]')) { Object.assign(e, { editing: false, draft: copy(e.saved) }); draw(); }
+            if (ev.target.closest('[data-remove]')) {
+                // (one that was never saved just goes; a saved one asks first)
+                if (e.saved) e.removing = true;
+                else entries.splice(entries.indexOf(e), 1);
+                draw();
+            }
+            if (ev.target.closest('[data-keep]')) { e.removing = false; draw(); }
+            if (ev.target.closest('[data-remove-yes]')) save(e, ev.target.closest('.btn'), { removeId: e.id });
+            if (ev.target.closest('[data-save]')) {
+                const p = problem(e, box);
+                if (p) {
+                    box.querySelector('[data-entry-error]').textContent = p[1];
+                    p[0].classList.add('is-invalid');
+                    p[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    p[0].focus({ preventScroll: true });
+                    return;
+                }
+                save(e, ev.target.closest('.btn'), e.kind === 'lastCall' ? { lastCall: timeOf(e.draft.time) || '' } : { item: itemOf(e, e.draft) });
+            }
+        });
+
+        // What's missing from one entry: [the element to point at, what to say], or null
+        function problem(e, box) {
+            box.querySelector('[data-entry-error]').textContent = '';
+            clearInvalid(box);
+            const d = e.draft;
+            const timeProblem = (t, what) => {
+                if (timeOf(d[t])) return null;
+                const p = box.querySelector('[data-time="' + t + '"]');
+                return [p.querySelector(d[t].h ? '.rh-m' : '.rh-h'), 'Please pick the ' + what + '.'];
+            };
+            if (e.kind === 'lastCall') return d.time.h || d.time.m ? timeProblem('time', 'whole time, or clear the hour and minute for no last call') : null;
+            if (!audOf(d.aud)) return [box.querySelector('.rh-aud'), 'Please enter an auditorium from 1 to 14.'];
+            const t = timeProblem('start', 'start time') || timeProblem('end', 'end time');
+            if (t) return t;
+            if (moment(day, timeOf(d.end)) <= moment(day, timeOf(d.start))) return [box.querySelector('[data-time="end"] .rh-h'), 'The end time has to be after the start time.'];
+            return null;
+        }
+        // Saves one entry's change (or removes it) into the shared schedule; the schedule comes back as it is now
+        async function save(target, btn, change) {
+            const error = boxOf(target).querySelector('[data-entry-error]');
+            busy = true;
+            btn.disabled = true;
+            btn.classList.add('is-loading');
+            try {
+                const json = await api({ action: 'saveRoadhouseShowtime', day, ...change });
+                if (!json.ok) throw json;
+                // (the saved one: by its new ID if it was new)
+                if (change.item && !target.id) target.id = json.shows[json.shows.length - 1].id;
+                Object.assign(target, { editing: false, removing: false });
+                if (change.removeId) entries.splice(entries.indexOf(target), 1);
+                apply(json);
+                draw();
+                const moved = change.removeId ? null : entries.find(e => (target.id ? e.id === target.id : e === target));
+                if (moved && boxOf(moved)) boxOf(moved).scrollIntoView({ block: 'center', behavior: 'smooth' });
+            } catch (err) {
+                console.error(err);
+                if (error) error.textContent = errorText(err);
+                btn.disabled = false;
+                btn.classList.remove('is-loading');
+            } finally {
+                busy = false;
+            }
+        }
+
+        // Coming back to the page: the schedule again (someone may have changed it); a new day: signed out
+        let signOutNow = null;
+        async function refresh() {
+            try { const json = await api({ action: 'roadhouseSchedule', day }); if (json.ok) { apply(json); draw(); } } catch (err) { console.error(err); }
+        }
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible' || !currentUser) return;
+            if (showDay() !== today && signOutNow) { signOutNow(); return; }
+            if (!entries.some(changed) && !busy) refresh();
+        });
+        setInterval(() => { if (currentUser && showDay() !== today && signOutNow) signOutNow(); }, 30000);
+
+        // The day picker: today, tomorrow, then the weekday and date ("Wed, Nov 25")
+        function drawDays(days) {
+            const label = (d, i) => (i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : '') + (i < 2 ? ' · ' : '')
+                + new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
+            dayEl.innerHTML = days.map((d, i) => '<option value="' + d + '"' + (d === day ? ' selected' : '') + '>' + label(d, i) + '</option>').join('');
+            dayEl.disabled = false;
+        }
+        // Another day: its schedule (unsaved changes are let go only after asking)
+        dayEl.addEventListener('change', async () => {
+            if (entries.some(changed) && !confirm('Leave without saving your changes?')) { dayEl.value = day; return; }
+            day = dayEl.value;
+            entries = [];
+            listEl.innerHTML = '<p class="lead-message">Loading…</p>';
+            await refresh();
+        });
+
+        if (!isConfigured) {
+            location.replace('/login');
+        } else {
+            const { initializeApp } = await import(`${FIREBASE_SDK}/firebase-app.js`);
+            const { getAuth, onAuthStateChanged, signOut } = await import(`${FIREBASE_SDK}/firebase-auth.js`);
+            const auth = getAuth(initializeApp(firebaseConfig));
+            signOutNow = () => signOut(auth);
+
+            onAuthStateChanged(auth, async user => {
+                if (!user) { location.replace('/login?next=' + encodeURIComponent(location.pathname + location.search)); return; }
+                // Signed in before today's 6 AM: signed out (which comes back here with no user)
+                if (showDay(Date.parse(user.metadata.lastSignInTime)) !== showDay()) { signOut(auth); return; }
+                currentUser = user;
+                try {
+                    const json = await api({ action: 'roadhouseSchedule', day });
+                    if (json.ok) { apply(json); draw(); }
+                    else if (json.error === 'not_found') { location.replace('/login'); return; }
+                    else if (json.error === 'not_allowed') listEl.innerHTML = '<p class="lead-message">This page is only for managers. <a href="/">Back home</a></p>';
+                    else throw json;
+                } catch (err) {
+                    console.error(err);
+                    listEl.innerHTML = '<p class="lead-message">We couldn’t load the schedule. Please refresh to try again.</p>';
+                }
+                document.body.classList.remove('is-checking');
+            });
+
+            const signOutBtn = document.getElementById('sign-out');
+            signOutBtn.addEventListener('click', async () => {
+                signOutBtn.disabled = true;
+                await signOut(auth);
+            });
+        }
+    </script>
+</body>
+</html>

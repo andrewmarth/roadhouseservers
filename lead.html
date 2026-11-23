@@ -25,6 +25,15 @@
         .now-line { margin-bottom: 18px; font-size: 0.92rem; color: var(--muted); }
         .lead-message { color: var(--muted); }
         .lead-message a { color: var(--gold); }
+        /* Which day: today and the next 4 */
+        .day-pick { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+        .day-pick label { font-family: 'Oswald', sans-serif; font-size: 1rem; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); }
+        .day-pick select {
+            flex: 1; min-width: 0; max-width: 320px; min-height: 48px; padding: 10px 40px 10px 16px; border: 1px solid var(--line-strong); border-radius: 10px;
+            font-family: inherit; font-size: 1.05rem; color: var(--text); appearance: none; -webkit-appearance: none;
+            background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c79048' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center / 16px;
+        }
+        .day-pick select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(199, 144, 72, 0.3); }
 
         /* --- The day's schedule: last call, then each showing and restroom check, each saved on its own and then
            shown locked behind Edit --- */
@@ -133,10 +142,11 @@
             <div class="card-head">
                 <div>
                     <span class="card-eyebrow">Server Lead</span>
-                    <h2>Today’s Schedule</h2>
+                    <h2>Floorplan</h2>
                 </div>
             </div>
-            <p class="now-line">Every server lead shares this schedule. Each server sees only their own rows. It clears at 6 AM.</p>
+            <p class="now-line">Pick the server for each row, and add the restroom checks. Managers set the showtimes; each server sees only their own rows.</p>
+            <div class="day-pick"><label for="day">Day</label><select id="day" disabled><option>Today</option></select></div>
             <div id="schedule"></div>
         </section>
     </main>
@@ -144,8 +154,8 @@
     <script type="module">
         import { firebaseConfig, isConfigured, API_URL, FIREBASE_SDK } from '/firebase-config.js';
 
-        // --- Time: everything is Arizona time (MST all year, UTC-7). A day runs from 6 AM to 6 AM, when the schedule
-        // clears and everyone is signed out. ---
+        // --- Time: everything is Arizona time (MST all year, UTC-7). A day runs from 6 AM to 6 AM, when everyone is
+        // signed out. ---
         const AZ_OFFSET = 7 * 3600e3;
         const DAY_START_HOUR = 6;
         const MIN = 60000;
@@ -176,14 +186,18 @@
             server_twice: 'Each server can be added to a showing only once.',
             row_taken: 'A row can go to only one server.',
             invalid_last_call: 'Please pick the whole last call time, or leave it blank.',
-            not_found: 'Another lead changed this. Refresh the page.',
-            not_allowed: 'Only server leads can change the schedule.',
+            not_found: 'Someone else changed this. Refresh the page.',
+            invalid_day: 'That day can’t be changed anymore. Pick another day.',
+            not_allowed: 'Only server leads can change the floorplan.',
         };
         const errorText = json => ERRORS[json && json.error] || 'Something went wrong. Please try again.';
 
         const listEl = document.getElementById('schedule');
         let currentUser = null;
+        // The day being shown (today or one of the next 4); today itself, for the 6 AM sign-out
         let day = showDay();
+        const today = showDay();
+        const dayEl = document.getElementById('day');
         let servers = [];   // [{ id, name }]: the SERVER accounts, by name
         // Last call, then each showing / restroom check: { id, kind ('lastCall', 'show' or 'restroom'), saved (the saved
         // values in the form's shape; null: not saved yet), draft (the form's values), editing, removing }
@@ -200,8 +214,7 @@
 
         // --- The form's values ---
         const blankTime = () => ({ h: '', m: '', ap: 'PM' });
-        const blankDraft = kind => (kind === 'show' ? { aud: '', start: blankTime(), end: blankTime(), last: false, assignments: [] }
-            : kind === 'restroom' ? { time: blankTime(), server: '' } : { time: blankTime() });
+        const blankDraft = kind => (kind === 'restroom' ? { time: blankTime(), server: '' } : {});
         const copy = v => JSON.parse(JSON.stringify(v));
         const audOf = v => (/^\d{1,2}$/.test(String(v)) && ROWS[Number(v)] ? Number(v) : 0);
         // "HH:MM" (24-hour) from the picker, or null until hour, minute and AM/PM are all picked
@@ -212,9 +225,9 @@
         const formOf = s => (s.kind === 'restroom' ? { time: pickerOf(s.time), server: s.server }
             : { aud: String(s.auditorium), start: pickerOf(s.start), end: pickerOf(s.end), last: s.last,
                 assignments: s.assignments.map(a => ({ server: a.server, rows: [...a.rows] })) });
-        const itemOf = (e, d) => (e.kind === 'restroom' ? { id: e.id, kind: 'restroom', time: timeOf(d.time), server: d.server }
-            : { id: e.id, auditorium: audOf(d.aud), start: timeOf(d.start), end: timeOf(d.end), last: d.last,
-                assignments: d.assignments.map(a => ({ server: a.server, rows: a.rows })) });
+        // What a save sends: a restroom check, or a showing's servers and rows
+        const changeOf = (e, d) => (e.kind === 'restroom' ? { item: { id: e.id, kind: 'restroom', time: timeOf(d.time), server: d.server } }
+            : { assign: { showId: e.id, assignments: d.assignments.map(a => ({ server: a.server, rows: a.rows })) } });
         const changed = e => e.editing && JSON.stringify(e.draft) !== JSON.stringify(e.saved || blankDraft(e.kind));
 
         // Who has a row ('' for no one), and giving it to a server (or no one); a server with no rows left is taken off
@@ -250,7 +263,6 @@
             + (value && !servers.some(s => s.id === value) ? '<option value="' + escapeHtml(value) + '" selected>Removed server</option>' : '') + '</select>';
         function assignHtml(d) {
             const n = audOf(d.aud);
-            if (!n) return '<p class="rh-rows-empty">Enter the auditorium to see its rows.</p>';
             return '<div class="rh-rowlines">' + ROWS[n].split('').map(r => {
                 const server = serverOf(d, r);
                 return '<div class="rh-rowline" data-row="' + r + '"><span class="rh-rowname">Row ' + r + '</span>'
@@ -263,9 +275,9 @@
         function entryHtml(e, k, title) {
             const what = e.kind === 'restroom' ? 'restroom check' : 'showing';
             let head = '';
-            if (!e.editing && !e.removing) {
-                head = '<span class="rh-head-actions"><button type="button" class="rh-edit" data-edit aria-label="Edit ' + escapeHtml(title) + '">' + EDIT + 'Edit</button>'
-                    + (e.kind === 'lastCall' ? '' : '<button type="button" class="rh-remove" data-remove aria-label="Remove ' + escapeHtml(title) + '">' + CLOSE + 'Remove</button>') + '</span>';
+            if (!e.editing && !e.removing && e.kind !== 'lastCall') {
+                head = '<span class="rh-head-actions"><button type="button" class="rh-edit" data-edit aria-label="' + (e.kind === 'show' ? 'Assign rows for ' : 'Edit ') + escapeHtml(title) + '">' + EDIT + (e.kind === 'show' ? 'Assign' : 'Edit') + '</button>'
+                    + (e.kind === 'show' ? '' : '<button type="button" class="rh-remove" data-remove aria-label="Remove ' + escapeHtml(title) + '">' + CLOSE + 'Remove</button>') + '</span>';
             } else if (e.editing && !e.saved) head = '<button type="button" class="rh-remove" data-remove aria-label="Remove ' + escapeHtml(title) + '">' + CLOSE + 'Remove</button>';
             let body;
             if (e.removing) {
@@ -286,29 +298,24 @@
                 }
             } else {
                 const d = e.draft;
-                if (e.kind === 'lastCall') {
-                    body = timeHtml(k, 'time', 'Last Call', d.time) + '<p class="rh-hint">Showings that end after it drop at last call. Leave it blank if there’s none.</p>';
-                } else if (e.kind === 'restroom') {
+                if (e.kind === 'restroom') {
                     body = timeHtml(k, 'time', 'Time', d.time) + '<div class="field"><span class="rh-label">Server</span>' + serverSelect(d.server, 'Pick a server', 'Server for this restroom check') + '</div>';
                 } else {
-                    body = '<div class="field"><label for="rh-aud-' + k + '">Auditorium</label>'
-                        + '<input id="rh-aud-' + k + '" class="rh-aud" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="1–14" value="' + escapeHtml(d.aud) + '">'
-                        + '<p class="rh-error rh-aud-error" role="alert"></p></div>'
-                        + timeHtml(k, 'start', 'Start Time', d.start) + timeHtml(k, 'end', 'End Time', d.end)
-                        + '<label class="rh-check"><input type="checkbox" class="rh-last"' + (d.last ? ' checked' : '') + '>This is the last showing of the night</label>'
+                    body = '<div class="rh-sum"><p class="rh-sum-main">' + clockOf(d.start) + ' – ' + clockOf(d.end) + '</p>'
+                        + (d.last ? '<p class="rh-sum-tag">Last showing of the night</p>' : '') + '</div>'
                         + '<div><span class="rh-label">Rows</span><p class="rh-hint">Pick the server for each row (leave a row Unassigned if no one has it yet).</p>'
                         + '<div data-assign>' + assignHtml(d) + '</div></div>';
                 }
                 body += '<p class="rh-error" data-entry-error role="alert"></p>'
                     + '<div class="rh-entry-actions">' + (e.saved ? '<button type="button" class="btn btn-secondary" data-cancel>Cancel</button>' : '')
                     + '<button type="button" class="btn" data-save><span class="btn-spinner" aria-hidden="true"></span>Save '
-                    + (e.kind === 'lastCall' ? 'Last Call' : e.kind === 'restroom' ? 'Restroom Check' : 'Showing') + '</button></div>';
+                    + (e.kind === 'restroom' ? 'Restroom Check' : 'Rows') + '</button></div>';
             }
             return '<fieldset class="rh-entry' + (e.editing ? ' is-editing' : '') + '" data-k="' + k + '"><legend class="sr-only">' + escapeHtml(title) + '</legend>'
                 + '<div class="rh-entry-head"><span>' + escapeHtml(title) + '</span>' + head + '</div>' + body + '</fieldset>';
         }
-        // Last call, then a section per auditorium (its showings by start time), new showings not saved yet, and the
-        // restroom checks by time. Saved ones sit by what's saved, so one being edited doesn't move until it's saved.
+        // Last call (read only), then a section per auditorium (its showings by start time) and the restroom checks by
+        // time. Saved ones sit by what's saved, so one being edited doesn't move until it's saved.
         function draw() {
             const all = entries.map((e, k) => ({ e, k }));
             const at = (x, t) => moment(day, timeOf(x.e.saved[t]));
@@ -317,11 +324,10 @@
             const auds = [...new Set(shows.map(x => audOf(x.e.saved.aud)))].sort((a, b) => a - b);
             const section = (title, items, name) => (items.length ? '<section class="rh-section"><h3 class="rh-section-title">' + title + '</h3>'
                 + items.map((x, i) => entryHtml(x.e, x.k, name(x, i))).join('') + '</section>' : '');
-            listEl.innerHTML = '<div class="rh-entries">' + all.filter(x => x.e.kind === 'lastCall').map(x => entryHtml(x.e, x.k, 'When is last call?')).join('') + '</div>'
+            listEl.innerHTML = '<div class="rh-entries">' + all.filter(x => x.e.kind === 'lastCall').map(x => entryHtml(x.e, x.k, 'Last Call')).join('') + '</div>'
+                + (shows.length ? '' : '<p class="lead-message rh-section">No showtimes for this day yet. A manager adds them on the Showtime Dashboard.</p>')
                 + auds.map(n => section('Auditorium ' + n, shows.filter(x => audOf(x.e.saved.aud) === n).sort(byTime('start')), (x, i) => 'Showing ' + (i + 1))).join('')
-                + section('New Showing', all.filter(x => x.e.kind === 'show' && !x.e.saved), () => 'New Showing')
                 + section('Restroom Checks', all.filter(x => x.e.kind === 'restroom').sort(byTime('time')), () => 'Restroom Check')
-                + '<button type="button" class="rh-add" data-add-entry="show"' + (entries.length - 1 >= MAX_ITEMS ? ' hidden' : '') + '>' + PLUS + 'Add Another Showing</button>'
                 + '<button type="button" class="rh-add" data-add-entry="restroom"' + (entries.length - 1 >= MAX_ITEMS ? ' hidden' : '') + '>' + PLUS + 'Add Restroom Check</button>';
         }
         const entryOf = el => { const box = el.closest('[data-k]'); return box ? { box, e: entries[Number(box.dataset.k)] } : {}; };
@@ -333,6 +339,7 @@
         function apply(json) {
             day = json.day;
             servers = json.servers || servers;
+            if (json.days) drawDays(json.days);
             const lc = { time: json.lastCall ? pickerOf(json.lastCall) : blankTime() };
             const old = entries;
             const keep = e => (e && e.editing ? e : null);
@@ -345,22 +352,9 @@
                 return e;
             });
             entries = [lastCall].concat(saved, old.filter(e => !e.id && e.kind !== 'lastCall'));
-            if (entries.length === 1) entries.push({ id: '', kind: 'show', saved: null, draft: blankDraft('show'), editing: true });
         }
 
         // --- Typing and tapping ---
-        listEl.addEventListener('input', ev => {
-            const { box, e } = entryOf(ev.target);
-            if (!e || !ev.target.matches('.rh-aud')) return;
-            clearInvalid(box);
-            // Digits only; each server keeps only the rows this auditorium has
-            ev.target.value = ev.target.value.replace(/\D/g, '').slice(0, 2);
-            e.draft.aud = ev.target.value;
-            const n = audOf(e.draft.aud);
-            if (n) { e.draft.assignments.forEach(a => { a.rows = a.rows.filter(r => ROWS[n].includes(r)); }); e.draft.assignments = e.draft.assignments.filter(a => a.rows.length); }
-            box.querySelector('.rh-aud-error').textContent = e.draft.aud && !n ? 'Auditoriums are 1 to 14.' : '';
-            redrawAssign(box, e);
-        });
         listEl.addEventListener('change', ev => {
             const { box, e } = entryOf(ev.target);
             if (!e) return;
@@ -368,7 +362,6 @@
             const t = ev.target.closest('[data-time]');
             if (t && ev.target.matches('.rh-h')) e.draft[t.dataset.time].h = ev.target.value;
             if (t && ev.target.matches('.rh-m')) e.draft[t.dataset.time].m = ev.target.value;
-            if (ev.target.matches('.rh-last')) e.draft.last = ev.target.checked;
             const line = ev.target.closest('[data-row]');
             if (line && ev.target.matches('.rh-server')) { setRow(e.draft, line.dataset.row, ev.target.value); ev.target.classList.toggle('is-set', !!ev.target.value); }
             else if (ev.target.matches('.rh-server')) e.draft.server = ev.target.value;
@@ -417,7 +410,7 @@
                     p[0].focus({ preventScroll: true });
                     return;
                 }
-                save(e, ev.target.closest('.btn'), e.kind === 'lastCall' ? { lastCall: timeOf(e.draft.time) || '' } : { item: itemOf(e, e.draft) });
+                save(e, ev.target.closest('.btn'), changeOf(e, e.draft));
             }
         });
 
@@ -431,12 +424,7 @@
                 const p = box.querySelector('[data-time="' + t + '"]');
                 return [p.querySelector(d[t].h ? '.rh-m' : '.rh-h'), 'Please pick the ' + what + '.'];
             };
-            if (e.kind === 'lastCall') return d.time.h || d.time.m ? timeProblem('time', 'whole time, or clear the hour and minute for no last call') : null;
             if (e.kind === 'restroom') return timeProblem('time', 'time') || (d.server ? null : [box.querySelector('.rh-server'), 'Please pick the server for this restroom check.']);
-            if (!audOf(d.aud)) return [box.querySelector('.rh-aud'), 'Please enter an auditorium from 1 to 14.'];
-            const t = timeProblem('start', 'start time') || timeProblem('end', 'end time');
-            if (t) return t;
-            if (moment(day, timeOf(d.end)) <= moment(day, timeOf(d.start))) return [box.querySelector('[data-time="end"] .rh-h'), 'The end time has to be after the start time.'];
             return null;
         }
         // Saves one entry's change (or removes it) into the shared schedule; the schedule comes back as it is now
@@ -446,7 +434,7 @@
             btn.disabled = true;
             btn.classList.add('is-loading');
             try {
-                const json = await api({ action: 'saveRoadhouseSchedule', ...change });
+                const json = await api({ action: 'saveRoadhouseSchedule', day, ...change });
                 if (!json.ok) throw json;
                 // (the saved one: by its new ID if it was new)
                 if (change.item && !target.id) target.id = json.shows[json.shows.length - 1].id;
@@ -469,14 +457,30 @@
         // Coming back to the page: the schedule again (another lead may have changed it); a new day: signed out
         let signOutNow = null;
         async function refresh() {
-            try { const json = await api({ action: 'roadhouseSchedule' }); if (json.ok) { apply(json); draw(); } } catch (err) { console.error(err); }
+            try { const json = await api({ action: 'roadhouseSchedule', day }); if (json.ok) { apply(json); draw(); } } catch (err) { console.error(err); }
         }
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState !== 'visible' || !currentUser) return;
-            if (showDay() !== day && signOutNow) { signOutNow(); return; }
+            if (showDay() !== today && signOutNow) { signOutNow(); return; }
             if (!entries.some(changed) && !busy) refresh();
         });
-        setInterval(() => { if (currentUser && showDay() !== day && signOutNow) signOutNow(); }, 30000);
+        setInterval(() => { if (currentUser && showDay() !== today && signOutNow) signOutNow(); }, 30000);
+
+        // The day picker: today, tomorrow, then the weekday and date ("Wed, Nov 25")
+        function drawDays(days) {
+            const label = (d, i) => (i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : '') + (i < 2 ? ' · ' : '')
+                + new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
+            dayEl.innerHTML = days.map((d, i) => '<option value="' + d + '"' + (d === day ? ' selected' : '') + '>' + label(d, i) + '</option>').join('');
+            dayEl.disabled = false;
+        }
+        // Another day: its schedule (unsaved changes are let go only after asking)
+        dayEl.addEventListener('change', async () => {
+            if (entries.some(changed) && !confirm('Leave without saving your changes?')) { dayEl.value = day; return; }
+            day = dayEl.value;
+            entries = [];
+            listEl.innerHTML = '<p class="lead-message">Loading…</p>';
+            await refresh();
+        });
 
         if (!isConfigured) {
             location.replace('/login');
@@ -492,7 +496,7 @@
                 if (showDay(Date.parse(user.metadata.lastSignInTime)) !== showDay()) { signOut(auth); return; }
                 currentUser = user;
                 try {
-                    const json = await api({ action: 'roadhouseSchedule' });
+                    const json = await api({ action: 'roadhouseSchedule', day });
                     if (json.ok) { apply(json); draw(); }
                     else if (json.error === 'not_found') { location.replace('/login'); return; }
                     else if (json.error === 'not_allowed') listEl.innerHTML = '<p class="lead-message">This page is only for server leads. <a href="/">Back home</a></p>';
